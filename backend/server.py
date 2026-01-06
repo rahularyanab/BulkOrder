@@ -112,6 +112,106 @@ class OTPStore(BaseModel):
     expires_at: datetime
     attempts: int = 0
 
+# ===================== SUPPLIER MODELS =====================
+
+class Supplier(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    code: str  # HUL, ITC, FORTUNE
+    description: Optional[str] = None
+    is_active: bool = True
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+# ===================== PRODUCT MODELS =====================
+
+class ProductCreate(BaseModel):
+    name: str
+    brand: str
+    barcode: Optional[str] = None
+    unit: str  # e.g., "kg", "piece", "pack", "litre"
+    category: str
+    description: Optional[str] = None
+    image_base64: Optional[str] = None
+
+class ProductUpdate(BaseModel):
+    name: Optional[str] = None
+    brand: Optional[str] = None
+    barcode: Optional[str] = None
+    unit: Optional[str] = None
+    category: Optional[str] = None
+    description: Optional[str] = None
+    image_base64: Optional[str] = None
+
+class Product(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    brand: str
+    barcode: Optional[str] = None
+    unit: str
+    category: str
+    description: Optional[str] = None
+    image_base64: Optional[str] = None
+    is_active: bool = True
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+# ===================== SUPPLIER OFFER MODELS =====================
+
+class QuantitySlab(BaseModel):
+    min_qty: int
+    max_qty: Optional[int] = None  # None means unlimited
+    price_per_unit: float
+
+class SupplierOfferCreate(BaseModel):
+    product_id: str
+    supplier_id: str
+    zone_id: str
+    quantity_slabs: List[QuantitySlab]
+    min_fulfillment_qty: int  # Minimum quantity needed to fulfill
+    lead_time_days: int  # Delivery lead time in days
+
+class SupplierOfferUpdate(BaseModel):
+    quantity_slabs: Optional[List[QuantitySlab]] = None
+    min_fulfillment_qty: Optional[int] = None
+    lead_time_days: Optional[int] = None
+    is_active: Optional[bool] = None
+
+class SupplierOffer(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    product_id: str
+    supplier_id: str
+    zone_id: str
+    quantity_slabs: List[QuantitySlab]
+    min_fulfillment_qty: int
+    lead_time_days: int
+    current_aggregated_qty: int = 0  # Running total of orders
+    status: str = "open"  # open, ready_to_pack, fulfilled
+    is_active: bool = True
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+# Response model with joined data
+class SupplierOfferWithDetails(BaseModel):
+    id: str
+    product_id: str
+    product_name: str
+    product_brand: str
+    product_unit: str
+    product_category: str
+    product_image: Optional[str] = None
+    supplier_id: str
+    supplier_name: str
+    supplier_code: str
+    zone_id: str
+    zone_name: str
+    quantity_slabs: List[QuantitySlab]
+    min_fulfillment_qty: int
+    lead_time_days: int
+    current_aggregated_qty: int
+    status: str
+    is_active: bool
+    progress_percentage: float  # How close to min fulfillment
+
 # ===================== UTILITIES =====================
 
 def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
