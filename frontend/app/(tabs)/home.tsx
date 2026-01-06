@@ -23,6 +23,7 @@ interface Zone {
 
 export default function HomeScreen() {
   const { retailer } = useAuth();
+  const router = useRouter();
   const [zones, setZones] = useState<Zone[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
