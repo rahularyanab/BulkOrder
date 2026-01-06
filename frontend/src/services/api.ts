@@ -77,6 +77,42 @@ class ApiService {
     return response.data;
   }
 
+  // Supplier endpoints
+  async getSuppliers() {
+    const response = await this.client.get('/suppliers');
+    return response.data;
+  }
+
+  // Product endpoints
+  async getProducts(category?: string, brand?: string) {
+    const params = new URLSearchParams();
+    if (category) params.append('category', category);
+    if (brand) params.append('brand', brand);
+    const response = await this.client.get(`/products?${params.toString()}`);
+    return response.data;
+  }
+
+  async getProductCategories() {
+    const response = await this.client.get('/products/categories');
+    return response.data;
+  }
+
+  async getProductBrands() {
+    const response = await this.client.get('/products/brands');
+    return response.data;
+  }
+
+  // Offer endpoints
+  async getZoneOffers(zoneId: string) {
+    const response = await this.client.get(`/offers/zone/${zoneId}`);
+    return response.data;
+  }
+
+  async getOfferDetails(offerId: string) {
+    const response = await this.client.get(`/offers/${offerId}`);
+    return response.data;
+  }
+
   // Health check
   async healthCheck() {
     const response = await this.client.get('/health');
