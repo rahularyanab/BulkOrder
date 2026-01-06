@@ -112,15 +112,15 @@ export default function HomeScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           <View style={styles.actionsRow}>
-            <TouchableOpacity style={styles.actionCard}>
+            <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/(tabs)/catalog')}>
               <Ionicons name="add-circle" size={32} color="#6c5ce7" />
               <Text style={styles.actionText}>New Order</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.actionCard}>
-              <Ionicons name="list" size={32} color="#27ae60" />
+            <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/(tabs)/catalog')}>
+              <Ionicons name="grid" size={32} color="#27ae60" />
               <Text style={styles.actionText}>View Catalog</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.actionCard}>
+            <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/(tabs)/orders')}>
               <Ionicons name="time" size={32} color="#f39c12" />
               <Text style={styles.actionText}>Order History</Text>
             </TouchableOpacity>
