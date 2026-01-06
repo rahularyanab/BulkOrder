@@ -432,6 +432,139 @@ async def get_retailer_zones(user=Depends(get_current_user)):
     zones = await db.zones.find({"id": {"$in": retailer.get("zone_ids", [])}}).to_list(100)
     return [Zone(**zone) for zone in zones]
 
+# ===================== SUPPLIER ENDPOINTS =====================
+
+@api_router.get("/suppliers", response_model=List[Supplier])
+async def get_all_suppliers():
+    """Get all active suppliers"""
+    suppliers = await db.suppliers.find({"is_active": True}).to_list(100)
+    return [Supplier(**s) for s in suppliers]
+
+@api_router.get("/suppliers/{supplier_id}", response_model=Supplier)
+async def get_supplier(supplier_id: str):
+    """Get supplier by ID"""
+    supplier = await db.suppliers.find_one({"id": supplier_id})
+    if not supplier:
+        raise HTTPException(status_code=404, detail="Supplier not found")
+    return Supplier(**supplier)
+
+# ===================== PRODUCT ENDPOINTS =====================
+
+@api_router.get("/products", response_model=List[Product])
+async def get_all_products(category: Optional[str] = None, brand: Optional[str] = None):
+    """Get all active products with optional filters"""
+    query = {"is_active": True}
+    if category:
+        query["category"] = category
+    if brand:
+        query["brand"] = brand
+    
+    products = await db.products.find(query).to_list(1000)
+    return [Product(**p) for p in products]
+
+@api_router.get("/products/categories")
+async def get_product_categories():
+    """Get all unique product categories"""
+    categories = await db.products.distinct("category", {"is_active": True})
+    return {"categories": categories}
+
+@api_router.get("/products/brands")
+async def get_product_brands():
+    """Get all unique product brands"""
+    brands = await db.products.distinct("brand", {"is_active": True})
+    return {"brands": brands}
+
+@api_router.get("/products/{product_id}", response_model=Product)
+async def get_product(product_id: str):
+    """Get product by ID"""
+    product = await db.products.find_one({"id": product_id})
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    return Product(**product)
+
+# ===================== SUPPLIER OFFER ENDPOINTS =====================
+
+@api_router.get("/offers/zone/{zone_id}")
+async def get_zone_offers(zone_id: str, user=Depends(get_current_user)):
+    """Get all active offers for a specific zone with full details"""
+    offers = await db.supplier_offers.find({
+        "zone_id": zone_id,
+        "is_active": True,
+        "status": {"$in": ["open", "ready_to_pack"]}
+    }).to_list(1000)
+    
+    result = []
+    for offer in offers:
+        # Get product details
+        product = await db.products.find_one({"id": offer["product_id"]})
+        supplier = await db.suppliers.find_one({"id": offer["supplier_id"]})
+        zone = await db.zones.find_one({"id": offer["zone_id"]})
+        
+        if product and supplier and zone:
+            progress = (offer["current_aggregated_qty"] / offer["min_fulfillment_qty"]) * 100 if offer["min_fulfillment_qty"] > 0 else 0
+            
+            result.append(SupplierOfferWithDetails(
+                id=offer["id"],
+                product_id=offer["product_id"],
+                product_name=product["name"],
+                product_brand=product["brand"],
+                product_unit=product["unit"],
+                product_category=product["category"],
+                product_image=product.get("image_base64"),
+                supplier_id=offer["supplier_id"],
+                supplier_name=supplier["name"],
+                supplier_code=supplier["code"],
+                zone_id=offer["zone_id"],
+                zone_name=zone["name"],
+                quantity_slabs=[QuantitySlab(**slab) for slab in offer["quantity_slabs"]],
+                min_fulfillment_qty=offer["min_fulfillment_qty"],
+                lead_time_days=offer["lead_time_days"],
+                current_aggregated_qty=offer["current_aggregated_qty"],
+                status=offer["status"],
+                is_active=offer["is_active"],
+                progress_percentage=min(progress, 100)
+            ))
+    
+    return result
+
+@api_router.get("/offers/{offer_id}")
+async def get_offer_details(offer_id: str, user=Depends(get_current_user)):
+    """Get specific offer with full details"""
+    offer = await db.supplier_offers.find_one({"id": offer_id})
+    if not offer:
+        raise HTTPException(status_code=404, detail="Offer not found")
+    
+    product = await db.products.find_one({"id": offer["product_id"]})
+    supplier = await db.suppliers.find_one({"id": offer["supplier_id"]})
+    zone = await db.zones.find_one({"id": offer["zone_id"]})
+    
+    if not all([product, supplier, zone]):
+        raise HTTPException(status_code=404, detail="Related data not found")
+    
+    progress = (offer["current_aggregated_qty"] / offer["min_fulfillment_qty"]) * 100 if offer["min_fulfillment_qty"] > 0 else 0
+    
+    return SupplierOfferWithDetails(
+        id=offer["id"],
+        product_id=offer["product_id"],
+        product_name=product["name"],
+        product_brand=product["brand"],
+        product_unit=product["unit"],
+        product_category=product["category"],
+        product_image=product.get("image_base64"),
+        supplier_id=offer["supplier_id"],
+        supplier_name=supplier["name"],
+        supplier_code=supplier["code"],
+        zone_id=offer["zone_id"],
+        zone_name=zone["name"],
+        quantity_slabs=[QuantitySlab(**slab) for slab in offer["quantity_slabs"]],
+        min_fulfillment_qty=offer["min_fulfillment_qty"],
+        lead_time_days=offer["lead_time_days"],
+        current_aggregated_qty=offer["current_aggregated_qty"],
+        status=offer["status"],
+        is_active=offer["is_active"],
+        progress_percentage=min(progress, 100)
+    )
+
 # ===================== ADMIN ENDPOINTS =====================
 
 @api_router.post("/admin/zones", response_model=Zone)
@@ -446,6 +579,183 @@ async def get_all_retailers():
     """Admin: Get all retailers"""
     retailers = await db.retailers.find({}).to_list(1000)
     return [Retailer(**r) for r in retailers]
+
+# Admin: Supplier Management
+@api_router.post("/admin/suppliers", response_model=Supplier)
+async def create_supplier(name: str, code: str, description: Optional[str] = None):
+    """Admin: Create a new supplier"""
+    # Check if supplier code exists
+    existing = await db.suppliers.find_one({"code": code.upper()})
+    if existing:
+        raise HTTPException(status_code=400, detail="Supplier with this code already exists")
+    
+    supplier = Supplier(name=name, code=code.upper(), description=description)
+    await db.suppliers.insert_one(supplier.model_dump())
+    return supplier
+
+# Admin: Product Management
+@api_router.post("/admin/products", response_model=Product)
+async def create_product(product_data: ProductCreate):
+    """Admin: Create a new product"""
+    product = Product(**product_data.model_dump())
+    await db.products.insert_one(product.model_dump())
+    return product
+
+@api_router.put("/admin/products/{product_id}", response_model=Product)
+async def update_product(product_id: str, update_data: ProductUpdate):
+    """Admin: Update a product"""
+    product = await db.products.find_one({"id": product_id})
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    
+    update_dict = {k: v for k, v in update_data.model_dump().items() if v is not None}
+    if update_dict:
+        update_dict["updated_at"] = datetime.utcnow()
+        await db.products.update_one({"id": product_id}, {"$set": update_dict})
+    
+    updated = await db.products.find_one({"id": product_id})
+    return Product(**updated)
+
+@api_router.delete("/admin/products/{product_id}")
+async def delete_product(product_id: str):
+    """Admin: Soft delete a product"""
+    result = await db.products.update_one(
+        {"id": product_id},
+        {"$set": {"is_active": False, "updated_at": datetime.utcnow()}}
+    )
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Product not found")
+    return {"message": "Product deleted successfully"}
+
+# Admin: Supplier Offer Management
+@api_router.post("/admin/offers", response_model=SupplierOffer)
+async def create_supplier_offer(offer_data: SupplierOfferCreate):
+    """Admin: Create a new supplier offer for a zone"""
+    # Validate product exists
+    product = await db.products.find_one({"id": offer_data.product_id, "is_active": True})
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    
+    # Validate supplier exists
+    supplier = await db.suppliers.find_one({"id": offer_data.supplier_id, "is_active": True})
+    if not supplier:
+        raise HTTPException(status_code=404, detail="Supplier not found")
+    
+    # Validate zone exists
+    zone = await db.zones.find_one({"id": offer_data.zone_id, "is_active": True})
+    if not zone:
+        raise HTTPException(status_code=404, detail="Zone not found")
+    
+    # Check if same offer already exists
+    existing = await db.supplier_offers.find_one({
+        "product_id": offer_data.product_id,
+        "supplier_id": offer_data.supplier_id,
+        "zone_id": offer_data.zone_id,
+        "status": "open",
+        "is_active": True
+    })
+    if existing:
+        raise HTTPException(status_code=400, detail="Active offer already exists for this product/supplier/zone combination")
+    
+    offer = SupplierOffer(**offer_data.model_dump())
+    await db.supplier_offers.insert_one(offer.model_dump())
+    return offer
+
+@api_router.put("/admin/offers/{offer_id}", response_model=SupplierOffer)
+async def update_supplier_offer(offer_id: str, update_data: SupplierOfferUpdate):
+    """Admin: Update a supplier offer"""
+    offer = await db.supplier_offers.find_one({"id": offer_id})
+    if not offer:
+        raise HTTPException(status_code=404, detail="Offer not found")
+    
+    update_dict = {}
+    if update_data.quantity_slabs is not None:
+        update_dict["quantity_slabs"] = [slab.model_dump() for slab in update_data.quantity_slabs]
+    if update_data.min_fulfillment_qty is not None:
+        update_dict["min_fulfillment_qty"] = update_data.min_fulfillment_qty
+    if update_data.lead_time_days is not None:
+        update_dict["lead_time_days"] = update_data.lead_time_days
+    if update_data.is_active is not None:
+        update_dict["is_active"] = update_data.is_active
+    
+    if update_dict:
+        update_dict["updated_at"] = datetime.utcnow()
+        await db.supplier_offers.update_one({"id": offer_id}, {"$set": update_dict})
+    
+    updated = await db.supplier_offers.find_one({"id": offer_id})
+    return SupplierOffer(**updated)
+
+@api_router.get("/admin/offers")
+async def get_all_offers(zone_id: Optional[str] = None, supplier_id: Optional[str] = None):
+    """Admin: Get all supplier offers with optional filters"""
+    query = {}
+    if zone_id:
+        query["zone_id"] = zone_id
+    if supplier_id:
+        query["supplier_id"] = supplier_id
+    
+    offers = await db.supplier_offers.find(query).to_list(1000)
+    return [SupplierOffer(**o) for o in offers]
+
+# ===================== SEED DATA ENDPOINT =====================
+
+@api_router.post("/admin/seed")
+async def seed_initial_data():
+    """Admin: Seed initial suppliers and sample products"""
+    
+    # Create suppliers if not exist
+    suppliers_data = [
+        {"name": "Hindustan Unilever Limited", "code": "HUL", "description": "Leading FMCG company"},
+        {"name": "ITC Limited", "code": "ITC", "description": "Diversified conglomerate"},
+        {"name": "Fortune", "code": "FORTUNE", "description": "Adani Wilmar - Edible oils and foods"},
+    ]
+    
+    created_suppliers = []
+    for s in suppliers_data:
+        existing = await db.suppliers.find_one({"code": s["code"]})
+        if not existing:
+            supplier = Supplier(**s)
+            await db.suppliers.insert_one(supplier.model_dump())
+            created_suppliers.append(supplier.model_dump())
+        else:
+            created_suppliers.append(existing)
+    
+    # Create sample products
+    products_data = [
+        # HUL Products
+        {"name": "Surf Excel Quick Wash", "brand": "Surf Excel", "unit": "kg", "category": "Detergent", "barcode": "8901030705533"},
+        {"name": "Vim Dishwash Bar", "brand": "Vim", "unit": "piece", "category": "Cleaning", "barcode": "8901030715253"},
+        {"name": "Lifebuoy Total Soap", "brand": "Lifebuoy", "unit": "piece", "category": "Personal Care", "barcode": "8901030725351"},
+        {"name": "Clinic Plus Shampoo", "brand": "Clinic Plus", "unit": "ml", "category": "Personal Care", "barcode": "8901030735450"},
+        # ITC Products
+        {"name": "Aashirvaad Atta", "brand": "Aashirvaad", "unit": "kg", "category": "Grocery", "barcode": "8901063155602"},
+        {"name": "Sunfeast Dark Fantasy", "brand": "Sunfeast", "unit": "pack", "category": "Biscuits", "barcode": "8901063165608"},
+        {"name": "Bingo Mad Angles", "brand": "Bingo", "unit": "pack", "category": "Snacks", "barcode": "8901063175607"},
+        {"name": "Classmate Notebook", "brand": "Classmate", "unit": "piece", "category": "Stationery", "barcode": "8901063185606"},
+        # Fortune Products
+        {"name": "Fortune Sunflower Oil", "brand": "Fortune", "unit": "litre", "category": "Edible Oil", "barcode": "8901058852349"},
+        {"name": "Fortune Soya Chunks", "brand": "Fortune", "unit": "kg", "category": "Grocery", "barcode": "8901058862340"},
+        {"name": "Fortune Basmati Rice", "brand": "Fortune", "unit": "kg", "category": "Grocery", "barcode": "8901058872341"},
+        {"name": "Fortune Besan", "brand": "Fortune", "unit": "kg", "category": "Grocery", "barcode": "8901058882342"},
+    ]
+    
+    created_products = []
+    for p in products_data:
+        existing = await db.products.find_one({"name": p["name"], "brand": p["brand"]})
+        if not existing:
+            product = Product(**p)
+            await db.products.insert_one(product.model_dump())
+            created_products.append(product.model_dump())
+        else:
+            created_products.append(existing)
+    
+    return {
+        "message": "Seed data created successfully",
+        "suppliers_created": len([s for s in created_suppliers if "id" in s]),
+        "products_created": len([p for p in created_products if "id" in p]),
+        "suppliers": created_suppliers,
+        "products": created_products
+    }
 
 # ===================== HEALTH CHECK =====================
 
