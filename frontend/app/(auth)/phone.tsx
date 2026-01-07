@@ -28,6 +28,12 @@ export default function PhoneScreen() {
       return;
     }
 
+    // Check if it's admin number - redirect to admin login
+    if (cleanPhone === '9999999999') {
+      router.push('/(auth)/admin-login');
+      return;
+    }
+
     setIsLoading(true);
     try {
       const response = await api.sendOTP(cleanPhone);
@@ -90,6 +96,15 @@ export default function PhoneScreen() {
         <Text style={styles.terms}>
           By continuing, you agree to our Terms of Service and Privacy Policy
         </Text>
+
+        {/* Admin Login Link */}
+        <TouchableOpacity 
+          style={styles.adminLink}
+          onPress={() => router.push('/(auth)/admin-login')}
+        >
+          <Ionicons name="shield-checkmark" size={16} color="#e74c3c" />
+          <Text style={styles.adminLinkText}>Login as Admin</Text>
+        </TouchableOpacity>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -164,5 +179,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
     marginTop: 24,
+  },
+  adminLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 32,
+    gap: 8,
+  },
+  adminLinkText: {
+    color: '#e74c3c',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
