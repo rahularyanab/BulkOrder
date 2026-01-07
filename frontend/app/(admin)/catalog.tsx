@@ -12,10 +12,12 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 import { api } from '../../src/services/api';
 
 interface Product {
@@ -25,6 +27,8 @@ interface Product {
   barcode: string;
   unit: string;
   category: string;
+  category_name?: string;
+  images: string[];
   is_active: boolean;
 }
 
@@ -60,6 +64,8 @@ export default function CatalogManagementScreen() {
   const [productBarcode, setProductBarcode] = useState('');
   const [productUnit, setProductUnit] = useState('kg');
   const [productCategory, setProductCategory] = useState('');
+  const [productImages, setProductImages] = useState<string[]>([]);
+  const [imageUrlInput, setImageUrlInput] = useState('');
   
   // Offer Modal
   const [offerModalVisible, setOfferModalVisible] = useState(false);
@@ -75,6 +81,7 @@ export default function CatalogManagementScreen() {
   ]);
 
   const [activeTab, setActiveTab] = useState<'products' | 'offers'>('products');
+  const [submitting, setSubmitting] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -105,12 +112,65 @@ export default function CatalogManagementScreen() {
     setRefreshing(false);
   };
 
+  // Image handling
+  const pickImage = async () => {
+    if (productImages.length >= 3) {
+      Alert.alert('Limit Reached', 'Maximum 3 images allowed per product');
+      return;
+    }
+
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Please allow access to your photo library');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+      base64: true,
+    });
+
+    if (!result.canceled && result.assets[0].base64) {
+      const base64Image = `data:image/jpeg;base64,${result.assets[0].base64}`;
+      setProductImages([...productImages, base64Image]);
+    }
+  };
+
+  const addImageUrl = () => {
+    if (productImages.length >= 3) {
+      Alert.alert('Limit Reached', 'Maximum 3 images allowed per product');
+      return;
+    }
+
+    if (!imageUrlInput.trim()) {
+      Alert.alert('Error', 'Please enter an image URL');
+      return;
+    }
+
+    // Basic URL validation
+    if (!imageUrlInput.startsWith('http://') && !imageUrlInput.startsWith('https://')) {
+      Alert.alert('Error', 'Please enter a valid URL starting with http:// or https://');
+      return;
+    }
+
+    setProductImages([...productImages, imageUrlInput.trim()]);
+    setImageUrlInput('');
+  };
+
+  const removeImage = (index: number) => {
+    setProductImages(productImages.filter((_, i) => i !== index));
+  };
+
   const handleAddProduct = async () => {
     if (!productName || !productBrand || !productUnit || !productCategory) {
       Alert.alert('Error', 'Please fill in all required fields');
       return;
     }
 
+    setSubmitting(true);
     try {
       await api.createProduct({
         name: productName,
@@ -118,6 +178,7 @@ export default function CatalogManagementScreen() {
         barcode: productBarcode || undefined,
         unit: productUnit,
         category: productCategory,
+        images: productImages,
       });
       Alert.alert('Success', 'Product added successfully');
       setProductModalVisible(false);
@@ -125,6 +186,8 @@ export default function CatalogManagementScreen() {
       fetchData();
     } catch (error: any) {
       Alert.alert('Error', error.response?.data?.detail || 'Failed to add product');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -134,6 +197,8 @@ export default function CatalogManagementScreen() {
     setProductBarcode('');
     setProductUnit('kg');
     setProductCategory('');
+    setProductImages([]);
+    setImageUrlInput('');
   };
 
   const handleCreateOffer = async () => {
@@ -142,6 +207,7 @@ export default function CatalogManagementScreen() {
       return;
     }
 
+    setSubmitting(true);
     try {
       await api.createOffer({
         product_id: selectedProduct.id,
@@ -156,6 +222,8 @@ export default function CatalogManagementScreen() {
       resetOfferForm();
     } catch (error: any) {
       Alert.alert('Error', error.response?.data?.detail || 'Failed to create offer');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -259,16 +327,28 @@ export default function CatalogManagementScreen() {
             {/* Products List */}
             {products.map((product) => (
               <View key={product.id} style={styles.productCard}>
-                <View style={styles.productIcon}>
-                  <Ionicons name="cube" size={24} color="#6c5ce7" />
-                </View>
+                {product.images && product.images.length > 0 ? (
+                  <Image 
+                    source={{ uri: product.images[0] }} 
+                    style={styles.productImage}
+                  />
+                ) : (
+                  <View style={styles.productIcon}>
+                    <Ionicons name="cube" size={24} color="#6c5ce7" />
+                  </View>
+                )}
                 <View style={styles.productInfo}>
                   <Text style={styles.productName}>{product.name}</Text>
                   <Text style={styles.productMeta}>
-                    {product.brand} • {product.category} • {product.unit}
+                    {product.brand} • {product.category_name || product.category} • {product.unit}
                   </Text>
                   {product.barcode && (
                     <Text style={styles.productBarcode}>Barcode: {product.barcode}</Text>
+                  )}
+                  {product.images && product.images.length > 0 && (
+                    <Text style={styles.imageCount}>
+                      <Ionicons name="images" size={12} color="#6c5ce7" /> {product.images.length} images
+                    </Text>
                   )}
                 </View>
                 <TouchableOpacity
@@ -448,13 +528,19 @@ export default function CatalogManagementScreen() {
               <TouchableOpacity
                 style={[
                   styles.createButton,
-                  (!selectedProduct || !selectedSupplier || !selectedZone) && styles.createButtonDisabled,
+                  (!selectedProduct || !selectedSupplier || !selectedZone || submitting) && styles.createButtonDisabled,
                 ]}
                 onPress={handleCreateOffer}
-                disabled={!selectedProduct || !selectedSupplier || !selectedZone}
+                disabled={!selectedProduct || !selectedSupplier || !selectedZone || submitting}
               >
-                <Ionicons name="checkmark-circle" size={20} color="#fff" />
-                <Text style={styles.createButtonText}>Create Offer</Text>
+                {submitting ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                    <Text style={styles.createButtonText}>Create Offer</Text>
+                  </>
+                )}
               </TouchableOpacity>
             </View>
           </>
@@ -477,7 +563,10 @@ export default function CatalogManagementScreen() {
             <ScrollView showsVerticalScrollIndicator={false}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Add New Product</Text>
-                <TouchableOpacity onPress={() => setProductModalVisible(false)}>
+                <TouchableOpacity onPress={() => {
+                  setProductModalVisible(false);
+                  resetProductForm();
+                }}>
                   <Ionicons name="close" size={24} color="#fff" />
                 </TouchableOpacity>
               </View>
@@ -550,9 +639,71 @@ export default function CatalogManagementScreen() {
                 />
               </View>
 
-              <TouchableOpacity style={styles.submitButton} onPress={handleAddProduct}>
-                <Ionicons name="add-circle" size={20} color="#fff" />
-                <Text style={styles.submitButtonText}>Add Product</Text>
+              {/* Image Section */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Product Images (up to 3)</Text>
+                
+                {/* Image Preview */}
+                {productImages.length > 0 && (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imagePreviewScroll}>
+                    {productImages.map((img, index) => (
+                      <View key={index} style={styles.imagePreviewContainer}>
+                        <Image source={{ uri: img }} style={styles.imagePreview} />
+                        <TouchableOpacity 
+                          style={styles.removeImageBtn}
+                          onPress={() => removeImage(index)}
+                        >
+                          <Ionicons name="close-circle" size={24} color="#e74c3c" />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </ScrollView>
+                )}
+
+                {/* Add Image Buttons */}
+                {productImages.length < 3 && (
+                  <View style={styles.imageButtonsRow}>
+                    <TouchableOpacity style={styles.imageButton} onPress={pickImage}>
+                      <Ionicons name="images" size={20} color="#6c5ce7" />
+                      <Text style={styles.imageButtonText}>Gallery</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {/* URL Input */}
+                {productImages.length < 3 && (
+                  <View style={styles.urlInputRow}>
+                    <TextInput
+                      style={[styles.input, { flex: 1 }]}
+                      value={imageUrlInput}
+                      onChangeText={setImageUrlInput}
+                      placeholder="Or paste image URL..."
+                      placeholderTextColor="#666"
+                    />
+                    <TouchableOpacity style={styles.urlAddBtn} onPress={addImageUrl}>
+                      <Ionicons name="add" size={24} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                <Text style={styles.imageHint}>
+                  {productImages.length}/3 images added
+                </Text>
+              </View>
+
+              <TouchableOpacity 
+                style={[styles.submitButton, submitting && styles.submitButtonDisabled]} 
+                onPress={handleAddProduct}
+                disabled={submitting}
+              >
+                {submitting ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="add-circle" size={20} color="#fff" />
+                    <Text style={styles.submitButtonText}>Add Product</Text>
+                  </>
+                )}
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -627,6 +778,11 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 8,
   },
+  productImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+  },
   productIcon: {
     width: 48,
     height: 48,
@@ -651,6 +807,11 @@ const styles = StyleSheet.create({
   },
   productBarcode: {
     color: '#666',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  imageCount: {
+    color: '#6c5ce7',
     fontSize: 11,
     marginTop: 2,
   },
@@ -817,7 +978,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
-    maxHeight: '85%',
+    maxHeight: '90%',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -857,6 +1018,65 @@ const styles = StyleSheet.create({
   unitChipTextActive: {
     color: '#fff',
   },
+  // Image related styles
+  imagePreviewScroll: {
+    marginBottom: 12,
+  },
+  imagePreviewContainer: {
+    position: 'relative',
+    marginRight: 12,
+  },
+  imagePreview: {
+    width: 80,
+    height: 80,
+    borderRadius: 12,
+    backgroundColor: '#0f0f1a',
+  },
+  removeImageBtn: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: '#1a1a2e',
+    borderRadius: 12,
+  },
+  imageButtonsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 12,
+  },
+  imageButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0f0f1a',
+    padding: 12,
+    borderRadius: 12,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#6c5ce7',
+  },
+  imageButtonText: {
+    color: '#6c5ce7',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  urlInputRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  urlAddBtn: {
+    backgroundColor: '#6c5ce7',
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imageHint: {
+    color: '#666',
+    fontSize: 12,
+    marginTop: 8,
+  },
   submitButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -866,6 +1086,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginTop: 8,
     gap: 8,
+  },
+  submitButtonDisabled: {
+    backgroundColor: '#4a4a5e',
   },
   submitButtonText: {
     color: '#fff',
