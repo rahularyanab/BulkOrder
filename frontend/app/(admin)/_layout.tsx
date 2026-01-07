@@ -46,6 +46,15 @@ export default function AdminLayout() {
         }}
       />
       <Tabs.Screen
+        name="bids"
+        options={{
+          title: 'Bids',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="hand-left" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="fulfillment"
         options={{
           title: 'Fulfillment',
