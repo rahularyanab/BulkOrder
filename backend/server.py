@@ -262,6 +262,47 @@ class OrderItemWithOffer(BaseModel):
     offer_progress_percentage: float
     created_at: datetime
 
+# ===================== PAYMENT MODELS =====================
+
+class PaymentMethod(str):
+    CASH = "cash"
+    UPI = "upi"
+    BANK_TRANSFER = "bank_transfer"
+    CHEQUE = "cheque"
+
+class PaymentCreate(BaseModel):
+    order_id: str
+    amount: float
+    payment_method: str  # cash, upi, bank_transfer, cheque
+    reference_number: Optional[str] = None
+    notes: Optional[str] = None
+
+class Payment(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    order_id: str
+    retailer_id: str
+    retailer_name: str
+    supplier_id: str
+    supplier_name: str
+    amount: float
+    payment_method: str
+    reference_number: Optional[str] = None
+    notes: Optional[str] = None
+    status: str = "locked"  # locked, released, disputed, refunded
+    lock_expires_at: datetime = None  # 48 hours from creation
+    dispute_reason: Optional[str] = None
+    dispute_raised_at: Optional[datetime] = None
+    released_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+class DisputeCreate(BaseModel):
+    payment_id: str
+    reason: str
+
+# Admin phone numbers (in production, store in DB)
+ADMIN_PHONES = ["9999999999", "8888888888", "1234567890"]
+
 # ===================== UTILITIES =====================
 
 def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
