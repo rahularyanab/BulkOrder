@@ -240,8 +240,9 @@ class SupplierOfferWithDetails(BaseModel):
     product_name: str
     product_brand: str
     product_unit: str
-    product_category_id: str
-    product_category_name: str
+    product_category: str  # Category name for display
+    product_category_id: Optional[str] = None
+    product_category_name: Optional[str] = None
     product_images: List[str] = []
     supplier_id: str
     supplier_name: str
