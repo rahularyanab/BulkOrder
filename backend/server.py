@@ -1052,6 +1052,342 @@ async def seed_initial_data():
         "products": created_products
     }
 
+# ===================== ADMIN FULFILLMENT ENDPOINTS =====================
+
+@api_router.get("/admin/fulfillment/ready")
+async def get_ready_to_pack_offers(admin=Depends(get_admin_user)):
+    """Admin: Get all offers ready to pack"""
+    offers = await db.supplier_offers.find({
+        "status": "ready_to_pack",
+        "is_active": True
+    }).to_list(1000)
+    
+    result = []
+    for offer in offers:
+        product = await db.products.find_one({"id": offer["product_id"]})
+        supplier = await db.suppliers.find_one({"id": offer["supplier_id"]})
+        zone = await db.zones.find_one({"id": offer["zone_id"]})
+        
+        # Get all orders for this offer
+        orders = await db.order_items.find({"offer_id": offer["id"]}).to_list(1000)
+        
+        if product and supplier and zone:
+            result.append({
+                "offer": offer,
+                "product": product,
+                "supplier": supplier,
+                "zone": zone,
+                "orders": orders,
+                "total_quantity": offer["current_aggregated_qty"],
+                "total_retailers": len(set(o["retailer_id"] for o in orders))
+            })
+    
+    return result
+
+@api_router.get("/admin/fulfillment/all")
+async def get_all_offers_for_fulfillment(admin=Depends(get_admin_user), status: Optional[str] = None):
+    """Admin: Get all offers with optional status filter"""
+    query = {"is_active": True}
+    if status:
+        query["status"] = status
+    
+    offers = await db.supplier_offers.find(query).sort("updated_at", -1).to_list(1000)
+    
+    result = []
+    for offer in offers:
+        product = await db.products.find_one({"id": offer["product_id"]})
+        supplier = await db.suppliers.find_one({"id": offer["supplier_id"]})
+        zone = await db.zones.find_one({"id": offer["zone_id"]})
+        orders = await db.order_items.find({"offer_id": offer["id"]}).to_list(1000)
+        
+        if product and supplier and zone:
+            result.append({
+                "offer": offer,
+                "product": product,
+                "supplier": supplier,
+                "zone": zone,
+                "orders": orders,
+                "total_quantity": offer["current_aggregated_qty"],
+                "total_retailers": len(set(o["retailer_id"] for o in orders))
+            })
+    
+    return result
+
+@api_router.put("/admin/fulfillment/offer/{offer_id}/status")
+async def update_offer_status(offer_id: str, new_status: str, admin=Depends(get_admin_user)):
+    """Admin: Update offer status (picked_up, out_for_delivery, delivered)"""
+    valid_statuses = ["open", "ready_to_pack", "picked_up", "out_for_delivery", "delivered"]
+    if new_status not in valid_statuses:
+        raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid_statuses}")
+    
+    offer = await db.supplier_offers.find_one({"id": offer_id})
+    if not offer:
+        raise HTTPException(status_code=404, detail="Offer not found")
+    
+    # Update offer status
+    await db.supplier_offers.update_one(
+        {"id": offer_id},
+        {"$set": {"status": new_status, "updated_at": datetime.utcnow()}}
+    )
+    
+    # Update all orders for this offer
+    await db.order_items.update_many(
+        {"offer_id": offer_id},
+        {"$set": {"status": new_status, "updated_at": datetime.utcnow()}}
+    )
+    
+    logger.info(f"Offer {offer_id} status updated to {new_status}")
+    
+    return {"success": True, "message": f"Offer status updated to {new_status}"}
+
+@api_router.get("/admin/orders")
+async def get_all_orders(admin=Depends(get_admin_user), status: Optional[str] = None, zone_id: Optional[str] = None):
+    """Admin: Get all orders with optional filters"""
+    query = {}
+    if status:
+        query["status"] = status
+    if zone_id:
+        query["zone_id"] = zone_id
+    
+    orders = await db.order_items.find(query).sort("created_at", -1).to_list(1000)
+    return orders
+
+# ===================== ADMIN PAYMENT ENDPOINTS =====================
+
+@api_router.post("/admin/payments")
+async def record_payment(payment_data: PaymentCreate, admin=Depends(get_admin_user)):
+    """Admin: Record payment for an order on delivery"""
+    # Get order
+    order = await db.order_items.find_one({"id": payment_data.order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    
+    # Check if payment already exists
+    existing_payment = await db.payments.find_one({"order_id": payment_data.order_id})
+    if existing_payment:
+        raise HTTPException(status_code=400, detail="Payment already recorded for this order")
+    
+    # Get supplier details
+    supplier = await db.suppliers.find_one({"id": order["supplier_id"]})
+    
+    # Create payment with 48-hour lock
+    lock_expires = datetime.utcnow() + timedelta(hours=48)
+    
+    payment = Payment(
+        order_id=payment_data.order_id,
+        retailer_id=order["retailer_id"],
+        retailer_name=order["retailer_name"],
+        supplier_id=order["supplier_id"],
+        supplier_name=supplier["name"] if supplier else "Unknown",
+        amount=payment_data.amount,
+        payment_method=payment_data.payment_method,
+        reference_number=payment_data.reference_number,
+        notes=payment_data.notes,
+        lock_expires_at=lock_expires
+    )
+    
+    await db.payments.insert_one(payment.model_dump())
+    
+    logger.info(f"Payment recorded: ₹{payment_data.amount} for order {payment_data.order_id}, locked until {lock_expires}")
+    
+    return {
+        "success": True,
+        "payment_id": payment.id,
+        "lock_expires_at": lock_expires.isoformat(),
+        "message": f"Payment of ₹{payment_data.amount} recorded. Locked for 48 hours until {lock_expires.strftime('%Y-%m-%d %H:%M')}"
+    }
+
+@api_router.get("/admin/payments")
+async def get_all_payments(admin=Depends(get_admin_user), status: Optional[str] = None):
+    """Admin: Get all payments with optional status filter"""
+    query = {}
+    if status:
+        query["status"] = status
+    
+    payments = await db.payments.find(query).sort("created_at", -1).to_list(1000)
+    
+    # Check and update expired locks
+    now = datetime.utcnow()
+    for payment in payments:
+        if payment["status"] == "locked" and payment.get("lock_expires_at") and payment["lock_expires_at"] < now:
+            # Auto-release payment to supplier
+            await db.payments.update_one(
+                {"id": payment["id"]},
+                {"$set": {"status": "released", "released_at": now, "updated_at": now}}
+            )
+            payment["status"] = "released"
+            payment["released_at"] = now
+            logger.info(f"Payment {payment['id']} auto-released to supplier")
+    
+    return payments
+
+@api_router.put("/admin/payments/{payment_id}/release")
+async def release_payment(payment_id: str, admin=Depends(get_admin_user)):
+    """Admin: Manually release payment to supplier"""
+    payment = await db.payments.find_one({"id": payment_id})
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    
+    if payment["status"] not in ["locked"]:
+        raise HTTPException(status_code=400, detail=f"Cannot release payment with status: {payment['status']}")
+    
+    now = datetime.utcnow()
+    await db.payments.update_one(
+        {"id": payment_id},
+        {"$set": {"status": "released", "released_at": now, "updated_at": now}}
+    )
+    
+    logger.info(f"Payment {payment_id} manually released to supplier")
+    
+    return {"success": True, "message": "Payment released to supplier"}
+
+# ===================== RETAILER DISPUTE ENDPOINTS =====================
+
+@api_router.get("/payments/me")
+async def get_my_payments(user=Depends(get_current_user)):
+    """Retailer: Get all my payments"""
+    phone = user.get("sub")
+    retailer = await db.retailers.find_one({"phone": phone})
+    
+    if not retailer:
+        raise HTTPException(status_code=404, detail="Retailer not found")
+    
+    payments = await db.payments.find({"retailer_id": retailer["id"]}).sort("created_at", -1).to_list(1000)
+    
+    # Add time remaining for lock
+    now = datetime.utcnow()
+    result = []
+    for p in payments:
+        payment_data = dict(p)
+        if p["status"] == "locked" and p.get("lock_expires_at"):
+            remaining = (p["lock_expires_at"] - now).total_seconds()
+            payment_data["lock_remaining_seconds"] = max(0, remaining)
+            payment_data["can_dispute"] = remaining > 0
+        else:
+            payment_data["lock_remaining_seconds"] = 0
+            payment_data["can_dispute"] = False
+        result.append(payment_data)
+    
+    return result
+
+@api_router.post("/payments/dispute")
+async def raise_dispute(dispute_data: DisputeCreate, user=Depends(get_current_user)):
+    """Retailer: Raise dispute within 48-hour lock window"""
+    phone = user.get("sub")
+    retailer = await db.retailers.find_one({"phone": phone})
+    
+    if not retailer:
+        raise HTTPException(status_code=404, detail="Retailer not found")
+    
+    payment = await db.payments.find_one({"id": dispute_data.payment_id})
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    
+    # Verify retailer owns this payment
+    if payment["retailer_id"] != retailer["id"]:
+        raise HTTPException(status_code=403, detail="Not authorized to dispute this payment")
+    
+    # Check if within lock window
+    if payment["status"] != "locked":
+        raise HTTPException(status_code=400, detail="Can only dispute locked payments")
+    
+    now = datetime.utcnow()
+    if payment.get("lock_expires_at") and now > payment["lock_expires_at"]:
+        raise HTTPException(status_code=400, detail="Lock window expired. Cannot raise dispute.")
+    
+    # Update payment with dispute
+    await db.payments.update_one(
+        {"id": dispute_data.payment_id},
+        {"$set": {
+            "status": "disputed",
+            "dispute_reason": dispute_data.reason,
+            "dispute_raised_at": now,
+            "updated_at": now
+        }}
+    )
+    
+    logger.info(f"Dispute raised by {retailer['shop_name']} for payment {dispute_data.payment_id}: {dispute_data.reason}")
+    
+    return {"success": True, "message": "Dispute raised successfully. Admin will review."}
+
+@api_router.put("/admin/payments/{payment_id}/resolve-dispute")
+async def resolve_dispute(payment_id: str, resolution: str, refund: bool = False, admin=Depends(get_admin_user)):
+    """Admin: Resolve a disputed payment"""
+    payment = await db.payments.find_one({"id": payment_id})
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    
+    if payment["status"] != "disputed":
+        raise HTTPException(status_code=400, detail="Payment is not disputed")
+    
+    now = datetime.utcnow()
+    new_status = "refunded" if refund else "released"
+    
+    await db.payments.update_one(
+        {"id": payment_id},
+        {"$set": {
+            "status": new_status,
+            "released_at": now if not refund else None,
+            "notes": f"{payment.get('notes', '')} | Resolution: {resolution}",
+            "updated_at": now
+        }}
+    )
+    
+    logger.info(f"Dispute for payment {payment_id} resolved: {resolution}, refund={refund}")
+    
+    return {"success": True, "message": f"Dispute resolved. Payment status: {new_status}"}
+
+# ===================== ADMIN DASHBOARD STATS =====================
+
+@api_router.get("/admin/dashboard/stats")
+async def get_dashboard_stats(admin=Depends(get_admin_user)):
+    """Admin: Get dashboard statistics"""
+    # Count offers by status
+    open_offers = await db.supplier_offers.count_documents({"status": "open", "is_active": True})
+    ready_offers = await db.supplier_offers.count_documents({"status": "ready_to_pack", "is_active": True})
+    delivered_offers = await db.supplier_offers.count_documents({"status": "delivered", "is_active": True})
+    
+    # Count orders
+    total_orders = await db.order_items.count_documents({})
+    pending_orders = await db.order_items.count_documents({"status": "pending"})
+    delivered_orders = await db.order_items.count_documents({"status": "delivered"})
+    
+    # Count retailers
+    total_retailers = await db.retailers.count_documents({})
+    
+    # Count zones
+    total_zones = await db.zones.count_documents({"is_active": True})
+    
+    # Payment stats
+    total_payments = await db.payments.count_documents({})
+    locked_payments = await db.payments.count_documents({"status": "locked"})
+    disputed_payments = await db.payments.count_documents({"status": "disputed"})
+    
+    # Calculate total revenue
+    payments = await db.payments.find({}).to_list(10000)
+    total_revenue = sum(p.get("amount", 0) for p in payments)
+    
+    return {
+        "offers": {
+            "open": open_offers,
+            "ready_to_pack": ready_offers,
+            "delivered": delivered_offers
+        },
+        "orders": {
+            "total": total_orders,
+            "pending": pending_orders,
+            "delivered": delivered_orders
+        },
+        "retailers": total_retailers,
+        "zones": total_zones,
+        "payments": {
+            "total": total_payments,
+            "locked": locked_payments,
+            "disputed": disputed_payments,
+            "total_revenue": total_revenue
+        }
+    }
+
 # ===================== HEALTH CHECK =====================
 
 @api_router.get("/")
