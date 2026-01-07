@@ -119,7 +119,7 @@ export default function AdminBidsScreen() {
     setActionLoading(true);
     try {
       // Create the offer
-      await api.createOffer({
+      const createdOffer = await api.createOffer({
         product_id: selectedBid.product_id,
         supplier_id: selectedSupplier.id,
         zone_id: selectedBid.zone_id,
@@ -128,12 +128,20 @@ export default function AdminBidsScreen() {
         lead_time_days: parseInt(leadTimeDays),
       });
 
+      // Create an order for the retailer with their requested quantity
+      await api.createOrderForRetailer(
+        selectedBid.retailer_id,
+        createdOffer.id,
+        selectedBid.requested_quantity
+      );
+
       // Approve the bid request
       await api.approveBidRequest(selectedBid.id);
 
       Alert.alert(
         'Success!',
-        `Offer created and bid request approved!\n\nRetailers in ${selectedBid.zone_name} can now see this offer.`,
+        `Offer created with ${selectedBid.requested_quantity} ${selectedBid.product_unit || 'units'} ordered!\n\n` +
+        `The retailer's order has been placed and the offer is now visible as an Active Bid.`,
         [
           {
             text: 'OK',
