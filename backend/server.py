@@ -278,6 +278,16 @@ def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> fl
     
     return R * c
 
+def get_price_for_quantity(slabs: List[dict], quantity: int) -> float:
+    """Get price per unit based on quantity and slabs"""
+    for slab in slabs:
+        min_qty = slab.get("min_qty", 0)
+        max_qty = slab.get("max_qty")
+        if quantity >= min_qty and (max_qty is None or quantity <= max_qty):
+            return slab.get("price_per_unit", 0)
+    # Return first slab price as default
+    return slabs[0].get("price_per_unit", 0) if slabs else 0
+
 def generate_otp() -> str:
     """Generate 6-digit OTP"""
     return ''.join(random.choices(string.digits, k=6))
