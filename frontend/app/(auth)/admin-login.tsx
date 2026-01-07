@@ -152,17 +152,23 @@ export default function AdminLoginScreen() {
                 />
               </View>
 
-              <TouchableOpacity
-                style={[styles.button, !password && styles.buttonDisabled]}
+              <Pressable
+                style={({ pressed }) => [
+                  styles.button, 
+                  !password && styles.buttonDisabled,
+                  pressed && { opacity: 0.8 }
+                ]}
                 onPress={handlePasswordLogin}
                 disabled={!password || isLoading}
+                accessibilityRole="button"
+                accessibilityLabel="Login button"
               >
                 {isLoading ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
                   <Text style={styles.buttonText}>Login</Text>
                 )}
-              </TouchableOpacity>
+              </Pressable>
             </>
           ) : (
             <>
