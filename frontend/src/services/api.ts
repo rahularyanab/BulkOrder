@@ -113,6 +113,22 @@ class ApiService {
     return response.data;
   }
 
+  // Order endpoints
+  async createOrder(offerId: string, quantity: number) {
+    const response = await this.client.post('/orders', { offer_id: offerId, quantity });
+    return response.data;
+  }
+
+  async getMyOrders() {
+    const response = await this.client.get('/orders/me');
+    return response.data;
+  }
+
+  async getOrderDetails(orderId: string) {
+    const response = await this.client.get(`/orders/${orderId}`);
+    return response.data;
+  }
+
   // Health check
   async healthCheck() {
     const response = await this.client.get('/health');
