@@ -737,9 +737,12 @@ async def get_zone_offers(zone_id: str, user=Depends(get_current_user), active_o
             
             progress = (offer["current_aggregated_qty"] / offer["min_fulfillment_qty"]) * 100 if offer["min_fulfillment_qty"] > 0 else 0
             
-            # Get category name
-            category = await db.categories.find_one({"id": product.get("category_id")})
-            category_name = category["name"] if category else product.get("category", "Uncategorized")
+            # Get category name - support both category_id and category string
+            category_name = product.get("category", "Uncategorized")
+            if product.get("category_id"):
+                category = await db.categories.find_one({"id": product.get("category_id")})
+                if category:
+                    category_name = category["name"]
             
             result.append(SupplierOfferWithDetails(
                 id=offer["id"],
@@ -747,7 +750,8 @@ async def get_zone_offers(zone_id: str, user=Depends(get_current_user), active_o
                 product_name=product["name"],
                 product_brand=product["brand"],
                 product_unit=product["unit"],
-                product_category_id=product.get("category_id", ""),
+                product_category=category_name,
+                product_category_id=product.get("category_id"),
                 product_category_name=category_name,
                 product_images=product.get("images", []),
                 supplier_id=offer["supplier_id"],
