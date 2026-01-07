@@ -187,6 +187,11 @@ class ApiService {
     return response.data;
   }
 
+  async createOrderForRetailer(retailerId: string, offerId: string, quantity: number) {
+    const response = await this.client.post(`/admin/orders/create-for-retailer?retailer_id=${retailerId}&offer_id=${offerId}&quantity=${quantity}`);
+    return response.data;
+  }
+
   // Offer endpoints
   async getZoneOffers(zoneId: string) {
     const response = await this.client.get(`/offers/zone/${zoneId}`);
