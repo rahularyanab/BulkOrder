@@ -1092,6 +1092,98 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
   },
+  // Improved Price Section Styles
+  priceSection: {
+    flexDirection: 'row',
+    marginTop: 16,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#2d2d44',
+    gap: 12,
+  },
+  currentPriceBox: {
+    flex: 1,
+    backgroundColor: '#0f0f1a',
+    borderRadius: 12,
+    padding: 12,
+    alignItems: 'center',
+  },
+  currentPriceLabel: {
+    color: '#a0a0a0',
+    fontSize: 11,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  currentPriceValue: {
+    color: '#6c5ce7',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginTop: 4,
+  },
+  aggregatedQty: {
+    color: '#666',
+    fontSize: 11,
+    marginTop: 4,
+  },
+  nextSlabBox: {
+    flex: 1,
+    backgroundColor: 'rgba(39, 174, 96, 0.1)',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(39, 174, 96, 0.3)',
+  },
+  nextSlabHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  nextSlabTitle: {
+    color: '#27ae60',
+    fontSize: 11,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  nextSlabPrice: {
+    color: '#27ae60',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginTop: 4,
+  },
+  savingsTag: {
+    marginTop: 6,
+  },
+  savingsText: {
+    color: '#27ae60',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  bestPriceBox: {
+    flex: 1,
+    backgroundColor: 'rgba(39, 174, 96, 0.1)',
+    borderRadius: 12,
+    padding: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  bestPriceText: {
+    color: '#27ae60',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  leadTimeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 12,
+  },
+  leadTimeText: {
+    color: '#666',
+    fontSize: 12,
+  },
+  // Keep old styles for compatibility
   priceRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
