@@ -24,6 +24,7 @@ interface Retailer {
 interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
+  isAdmin: boolean;
   token: string | null;
   phone: string | null;
   retailer: Retailer | null;
@@ -31,6 +32,9 @@ interface AuthContextType {
   logout: () => Promise<void>;
   setRetailer: (retailer: Retailer) => void;
 }
+
+// Admin phone numbers
+const ADMIN_PHONES = ['9999999999', '8888888888', '1234567890'];
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -40,6 +44,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [phone, setPhone] = useState<string | null>(null);
   const [retailer, setRetailerState] = useState<Retailer | null>(null);
   const router = useRouter();
+
+  const isAdmin = phone ? ADMIN_PHONES.includes(phone) : false;
 
   useEffect(() => {
     loadStoredAuth();
