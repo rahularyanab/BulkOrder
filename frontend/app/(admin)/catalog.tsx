@@ -43,11 +43,18 @@ interface Zone {
   name: string;
 }
 
+interface SubCategory {
+  id: string;
+  name: string;
+  description?: string;
+}
+
 interface Category {
   id: string;
   name: string;
   parent_id?: string;
   description?: string;
+  subcategories?: SubCategory[];
   product_count?: number;
 }
 
