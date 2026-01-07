@@ -1260,6 +1260,82 @@ async def get_all_offers(zone_id: Optional[str] = None, supplier_id: Optional[st
     offers = await db.supplier_offers.find(query).to_list(1000)
     return [SupplierOffer(**o) for o in offers]
 
+@api_router.post("/admin/orders/create-for-retailer")
+async def create_order_for_retailer(retailer_id: str, offer_id: str, quantity: int):
+    """Admin: Create an order on behalf of a retailer (used when approving bid requests)"""
+    # Validate retailer exists
+    retailer = await db.retailers.find_one({"id": retailer_id})
+    if not retailer:
+        raise HTTPException(status_code=404, detail="Retailer not found")
+    
+    # Validate offer exists and is open
+    offer = await db.supplier_offers.find_one({"id": offer_id, "is_active": True})
+    if not offer:
+        raise HTTPException(status_code=404, detail="Offer not found")
+    
+    if offer["status"] not in ["open", "ready_to_pack"]:
+        raise HTTPException(status_code=400, detail="Offer is not accepting orders")
+    
+    # Calculate price based on slabs (using new aggregated quantity)
+    new_total_qty = offer["current_aggregated_qty"] + quantity
+    price_per_unit = offer["quantity_slabs"][0]["price_per_unit"]  # Default to first slab
+    
+    for slab in offer["quantity_slabs"]:
+        if new_total_qty >= slab["min_qty"] and (slab["max_qty"] is None or new_total_qty <= slab["max_qty"]):
+            price_per_unit = slab["price_per_unit"]
+            break
+    
+    # Create the order
+    order = Order(
+        retailer_id=retailer_id,
+        offer_id=offer_id,
+        quantity=quantity,
+        price_per_unit=price_per_unit,
+        total_amount=quantity * price_per_unit,
+        status="placed"
+    )
+    
+    await db.orders.insert_one(order.model_dump())
+    
+    # Update offer's aggregated quantity
+    await db.supplier_offers.update_one(
+        {"id": offer_id},
+        {"$inc": {"current_aggregated_qty": quantity}}
+    )
+    
+    # Check if minimum fulfillment is reached
+    updated_offer = await db.supplier_offers.find_one({"id": offer_id})
+    if updated_offer["current_aggregated_qty"] >= updated_offer["min_fulfillment_qty"]:
+        await db.supplier_offers.update_one(
+            {"id": offer_id},
+            {"$set": {"status": "ready_to_pack"}}
+        )
+    
+    # Update all orders for this offer with new price
+    await db.orders.update_many(
+        {"offer_id": offer_id, "status": "placed"},
+        {"$set": {"price_per_unit": price_per_unit}}
+    )
+    
+    # Recalculate total amount for all orders
+    all_orders = await db.orders.find({"offer_id": offer_id, "status": "placed"}).to_list(1000)
+    for o in all_orders:
+        new_total = o["quantity"] * price_per_unit
+        await db.orders.update_one(
+            {"id": o["id"]},
+            {"$set": {"total_amount": new_total}}
+        )
+    
+    logger.info(f"Admin created order for retailer {retailer.get('shop_name', retailer_id)} - {quantity} units at ₹{price_per_unit}")
+    
+    return {
+        "order_id": order.id,
+        "price_per_unit": price_per_unit,
+        "total_amount": order.total_amount,
+        "new_aggregated_qty": updated_offer["current_aggregated_qty"] if updated_offer else new_total_qty,
+        "offer_status": updated_offer["status"] if updated_offer else offer["status"]
+    }
+
 # ===================== SEED DATA ENDPOINT =====================
 
 @api_router.post("/admin/seed")
