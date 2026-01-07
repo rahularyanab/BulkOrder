@@ -154,6 +154,11 @@ class ApiService {
     return response.data;
   }
 
+  async deleteCategory(categoryId: string) {
+    const response = await this.client.delete(`/admin/categories/${categoryId}`);
+    return response.data;
+  }
+
   // Bid Request endpoints
   async createBidRequest(data: { product_id: string; zone_id: string; requested_quantity: number; notes?: string }) {
     const response = await this.client.post('/bid-requests', data);
