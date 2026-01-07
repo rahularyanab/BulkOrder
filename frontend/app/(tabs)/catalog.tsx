@@ -465,12 +465,18 @@ export default function CatalogScreen() {
                 </View>
 
                 <TouchableOpacity 
-                  style={[styles.orderButton, (!orderQuantity || parseInt(orderQuantity) <= 0) && styles.orderButtonDisabled]} 
+                  style={[styles.orderButton, (!orderQuantity || parseInt(orderQuantity) <= 0 || submitting) && styles.orderButtonDisabled]} 
                   onPress={handleAddToOrder}
-                  disabled={!orderQuantity || parseInt(orderQuantity) <= 0}
+                  disabled={!orderQuantity || parseInt(orderQuantity) <= 0 || submitting}
                 >
-                  <Ionicons name="cart" size={20} color="#fff" />
-                  <Text style={styles.orderButtonText}>Add to Order</Text>
+                  {submitting ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <>
+                      <Ionicons name="cart" size={20} color="#fff" />
+                      <Text style={styles.orderButtonText}>Add to Order</Text>
+                    </>
+                  )}
                 </TouchableOpacity>
               </ScrollView>
             )}
