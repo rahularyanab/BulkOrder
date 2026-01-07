@@ -582,6 +582,57 @@ async def get_retailer_zones(user=Depends(get_current_user)):
     zones = await db.zones.find({"id": {"$in": retailer.get("zone_ids", [])}}).to_list(100)
     return [Zone(**zone) for zone in zones]
 
+# ===================== CATEGORY ENDPOINTS =====================
+
+@api_router.get("/categories")
+async def get_all_categories():
+    """Get all categories with subcategories"""
+    categories = await db.categories.find({"is_active": True, "parent_id": None}).to_list(100)
+    result = []
+    for cat in categories:
+        cat_dict = {k: v for k, v in cat.items() if k != "_id"}
+        # Get subcategories
+        subcategories = await db.categories.find({"parent_id": cat["id"], "is_active": True}).to_list(100)
+        cat_dict["subcategories"] = [{k: v for k, v in sub.items() if k != "_id"} for sub in subcategories]
+        result.append(cat_dict)
+    return result
+
+@api_router.get("/categories/{category_id}")
+async def get_category(category_id: str):
+    """Get category by ID with subcategories"""
+    category = await db.categories.find_one({"id": category_id})
+    if not category:
+        raise HTTPException(status_code=404, detail="Category not found")
+    
+    cat_dict = {k: v for k, v in category.items() if k != "_id"}
+    subcategories = await db.categories.find({"parent_id": category_id, "is_active": True}).to_list(100)
+    cat_dict["subcategories"] = [{k: v for k, v in sub.items() if k != "_id"} for sub in subcategories]
+    return cat_dict
+
+@api_router.post("/admin/categories")
+async def create_category(category_data: CategoryCreate, admin=Depends(get_admin_user)):
+    """Admin: Create a new category or subcategory"""
+    # If parent_id is provided, verify parent exists
+    if category_data.parent_id:
+        parent = await db.categories.find_one({"id": category_data.parent_id})
+        if not parent:
+            raise HTTPException(status_code=404, detail="Parent category not found")
+    
+    category = Category(**category_data.model_dump())
+    await db.categories.insert_one(category.model_dump())
+    return {k: v for k, v in category.model_dump().items()}
+
+@api_router.delete("/admin/categories/{category_id}")
+async def delete_category(category_id: str, admin=Depends(get_admin_user)):
+    """Admin: Delete a category (soft delete)"""
+    result = await db.categories.update_one(
+        {"id": category_id},
+        {"$set": {"is_active": False}}
+    )
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Category not found")
+    return {"message": "Category deleted"}
+
 # ===================== SUPPLIER ENDPOINTS =====================
 
 @api_router.get("/suppliers", response_model=List[Supplier])
@@ -600,23 +651,40 @@ async def get_supplier(supplier_id: str):
 
 # ===================== PRODUCT ENDPOINTS =====================
 
-@api_router.get("/products", response_model=List[Product])
-async def get_all_products(category: Optional[str] = None, brand: Optional[str] = None):
+@api_router.get("/products")
+async def get_all_products(category_id: Optional[str] = None, brand: Optional[str] = None, search: Optional[str] = None):
     """Get all active products with optional filters"""
     query = {"is_active": True}
-    if category:
-        query["category"] = category
+    if category_id:
+        query["category_id"] = category_id
     if brand:
         query["brand"] = brand
     
     products = await db.products.find(query).to_list(1000)
-    return [Product(**p) for p in products]
+    
+    # Apply search filter
+    if search:
+        search_lower = search.lower()
+        products = [p for p in products if search_lower in p.get("name", "").lower() or search_lower in p.get("brand", "").lower()]
+    
+    result = []
+    for p in products:
+        p_dict = {k: v for k, v in p.items() if k != "_id"}
+        # Get category name
+        category = await db.categories.find_one({"id": p.get("category_id")})
+        p_dict["category_name"] = category["name"] if category else "Uncategorized"
+        if p.get("subcategory_id"):
+            subcategory = await db.categories.find_one({"id": p.get("subcategory_id")})
+            p_dict["subcategory_name"] = subcategory["name"] if subcategory else None
+        result.append(p_dict)
+    
+    return result
 
 @api_router.get("/products/categories")
 async def get_product_categories():
     """Get all unique product categories"""
-    categories = await db.products.distinct("category", {"is_active": True})
-    return {"categories": categories}
+    categories = await db.categories.find({"is_active": True, "parent_id": None}).to_list(100)
+    return {"categories": [{k: v for k, v in c.items() if k != "_id"} for c in categories]}
 
 @api_router.get("/products/brands")
 async def get_product_brands():
