@@ -29,8 +29,8 @@ export default function AdminLoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
 
   const handlePasswordLogin = async () => {
-    if (password !== ADMIN_PASSWORD) {
-      Alert.alert('Error', 'Invalid password');
+    if (!password) {
+      Alert.alert('Error', 'Please enter a password');
       return;
     }
 
@@ -39,7 +39,8 @@ export default function AdminLoginScreen() {
       // Use the admin login endpoint
       const response = await api.adminPasswordLogin(ADMIN_PHONE, password);
       if (response.token) {
-        await login(response.token, ADMIN_PHONE, true);
+        // login(token, isNewUser, retailerId) - admin is not a new user, no retailerId
+        await login(response.token, false, null);
         router.replace('/(admin)/dashboard');
       }
     } catch (error: any) {
