@@ -75,7 +75,8 @@ export default function AdminLoginScreen() {
     try {
       const response = await api.verifyOTP(ADMIN_PHONE, otp);
       if (response.token) {
-        await login(response.token, ADMIN_PHONE, true);
+        // login(token, isNewUser, retailerId) - admin is not a new user, no retailerId
+        await login(response.token, false, null);
         router.replace('/(admin)/dashboard');
       }
     } catch (error: any) {
