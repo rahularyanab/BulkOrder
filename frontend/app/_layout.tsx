@@ -22,6 +22,7 @@ export default function RootLayout() {
           <Stack.Screen name="(auth)/otp" options={{ title: 'Verify OTP' }} />
           <Stack.Screen name="(auth)/signup" options={{ title: 'Complete Signup' }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="(admin)" options={{ headerShown: false }} />
         </Stack>
       </AuthProvider>
     </SafeAreaProvider>
