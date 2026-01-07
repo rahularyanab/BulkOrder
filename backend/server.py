@@ -1108,12 +1108,19 @@ async def get_all_offers_for_fulfillment(admin=Depends(get_admin_user), status: 
         orders = await db.order_items.find({"offer_id": offer["id"]}).to_list(1000)
         
         if product and supplier and zone:
+            # Convert MongoDB docs to dict and remove _id
+            offer_dict = {k: v for k, v in offer.items() if k != "_id"}
+            product_dict = {k: v for k, v in product.items() if k != "_id"}
+            supplier_dict = {k: v for k, v in supplier.items() if k != "_id"}
+            zone_dict = {k: v for k, v in zone.items() if k != "_id"}
+            orders_list = [{k: v for k, v in o.items() if k != "_id"} for o in orders]
+            
             result.append({
-                "offer": offer,
-                "product": product,
-                "supplier": supplier,
-                "zone": zone,
-                "orders": orders,
+                "offer": offer_dict,
+                "product": product_dict,
+                "supplier": supplier_dict,
+                "zone": zone_dict,
+                "orders": orders_list,
                 "total_quantity": offer["current_aggregated_qty"],
                 "total_retailers": len(set(o["retailer_id"] for o in orders))
             })
