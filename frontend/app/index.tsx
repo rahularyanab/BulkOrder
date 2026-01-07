@@ -6,19 +6,22 @@ import { Ionicons } from '@expo/vector-icons';
 
 export default function SplashScreen() {
   const router = useRouter();
-  const { isAuthenticated, isLoading, retailer } = useAuth();
+  const { isAuthenticated, isLoading, isAdmin, retailer } = useAuth();
 
   useEffect(() => {
     if (!isLoading) {
-      if (isAuthenticated && retailer) {
+      if (isAuthenticated && isAdmin) {
+        // Admin users go directly to admin dashboard
+        router.replace('/(admin)/dashboard');
+      } else if (isAuthenticated && retailer) {
         router.replace('/(tabs)/home');
-      } else if (isAuthenticated && !retailer) {
+      } else if (isAuthenticated && !retailer && !isAdmin) {
         router.replace('/(auth)/signup');
       } else {
         router.replace('/(auth)/phone');
       }
     }
-  }, [isLoading, isAuthenticated, retailer]);
+  }, [isLoading, isAuthenticated, isAdmin, retailer]);
 
   return (
     <View style={styles.container}>
