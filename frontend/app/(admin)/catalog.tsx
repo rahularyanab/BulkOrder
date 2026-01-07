@@ -552,26 +552,95 @@ export default function CatalogManagementScreen() {
               </Text>
 
               {/* Product Selection */}
-              <Text style={styles.inputLabel}>Select Product *</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.selectionScroll}>
-                {products.map((product) => (
-                  <TouchableOpacity
-                    key={product.id}
-                    style={[
-                      styles.selectionChip,
-                      selectedProduct?.id === product.id && styles.selectionChipActive,
-                    ]}
-                    onPress={() => setSelectedProduct(product)}
-                  >
-                    <Text style={[
-                      styles.selectionChipText,
-                      selectedProduct?.id === product.id && styles.selectionChipTextActive,
-                    ]}>
-                      {product.name}
-                    </Text>
+              {/* Product Search */}
+              <Text style={styles.inputLabel}>Search Product by Name or Barcode *</Text>
+              <View style={styles.searchContainer}>
+                <Ionicons name="search" size={20} color="#666" />
+                <TextInput
+                  style={styles.searchInput}
+                  value={productSearchQuery}
+                  onChangeText={(text) => {
+                    setProductSearchQuery(text);
+                    setShowProductResults(text.length > 0);
+                  }}
+                  placeholder="Type product name or barcode..."
+                  placeholderTextColor="#666"
+                  onFocus={() => setShowProductResults(productSearchQuery.length > 0)}
+                />
+                {productSearchQuery.length > 0 && (
+                  <TouchableOpacity onPress={() => {
+                    setProductSearchQuery('');
+                    setShowProductResults(false);
+                  }}>
+                    <Ionicons name="close-circle" size={20} color="#666" />
                   </TouchableOpacity>
-                ))}
-              </ScrollView>
+                )}
+              </View>
+              
+              {/* Selected Product Display */}
+              {selectedProduct && (
+                <View style={styles.selectedProductCard}>
+                  <View style={styles.selectedProductInfo}>
+                    <Text style={styles.selectedProductName}>{selectedProduct.name}</Text>
+                    <Text style={styles.selectedProductMeta}>
+                      {selectedProduct.brand} • {selectedProduct.category || selectedProduct.category_name} • {selectedProduct.unit}
+                    </Text>
+                    {selectedProduct.barcode && (
+                      <Text style={styles.selectedProductBarcode}>Barcode: {selectedProduct.barcode}</Text>
+                    )}
+                  </View>
+                  <TouchableOpacity 
+                    style={styles.clearProductBtn}
+                    onPress={() => setSelectedProduct(null)}
+                  >
+                    <Ionicons name="close" size={20} color="#e74c3c" />
+                  </TouchableOpacity>
+                </View>
+              )}
+              
+              {/* Search Results */}
+              {showProductResults && !selectedProduct && (
+                <View style={styles.searchResults}>
+                  {products
+                    .filter(p => {
+                      const query = productSearchQuery.toLowerCase();
+                      return p.name.toLowerCase().includes(query) || 
+                             p.brand.toLowerCase().includes(query) ||
+                             (p.barcode && p.barcode.includes(productSearchQuery));
+                    })
+                    .slice(0, 5)
+                    .map((product) => (
+                      <TouchableOpacity
+                        key={product.id}
+                        style={styles.searchResultItem}
+                        onPress={() => {
+                          setSelectedProduct(product);
+                          setProductSearchQuery('');
+                          setShowProductResults(false);
+                        }}
+                      >
+                        <View style={styles.searchResultIcon}>
+                          <Ionicons name="cube" size={20} color="#6c5ce7" />
+                        </View>
+                        <View style={styles.searchResultInfo}>
+                          <Text style={styles.searchResultName}>{product.name}</Text>
+                          <Text style={styles.searchResultMeta}>
+                            {product.brand} • {product.category || product.category_name}
+                            {product.barcode ? ` • ${product.barcode}` : ''}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  {products.filter(p => {
+                    const query = productSearchQuery.toLowerCase();
+                    return p.name.toLowerCase().includes(query) || 
+                           p.brand.toLowerCase().includes(query) ||
+                           (p.barcode && p.barcode.includes(productSearchQuery));
+                  }).length === 0 && (
+                    <Text style={styles.noResults}>No products found</Text>
+                  )}
+                </View>
+              )}
 
               {/* Supplier Selection */}
               <Text style={styles.inputLabel}>Select Supplier *</Text>
