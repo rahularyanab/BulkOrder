@@ -39,6 +39,11 @@ class ApiService {
     return response.data;
   }
 
+  async adminPasswordLogin(phone: string, password: string) {
+    const response = await this.client.post(`/auth/admin-login?phone=${phone}&password=${encodeURIComponent(password)}`);
+    return response.data;
+  }
+
   // Retailer endpoints
   async createRetailer(data: {
     shop_name: string;
