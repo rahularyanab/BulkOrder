@@ -119,6 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         isAuthenticated: !!token,
         isLoading,
+        isAdmin,
         token,
         phone,
         retailer,
