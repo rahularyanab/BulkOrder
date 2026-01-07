@@ -212,6 +212,56 @@ class SupplierOfferWithDetails(BaseModel):
     is_active: bool
     progress_percentage: float  # How close to min fulfillment
 
+# ===================== ORDER MODELS =====================
+
+class OrderItemCreate(BaseModel):
+    offer_id: str
+    quantity: int
+
+class OrderItem(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    offer_id: str
+    retailer_id: str
+    retailer_name: str
+    zone_id: str
+    product_id: str
+    product_name: str
+    product_brand: str
+    product_unit: str
+    supplier_id: str
+    supplier_name: str
+    supplier_code: str
+    quantity: int
+    price_per_unit: float  # Price at time of order based on aggregated qty
+    total_amount: float
+    status: str = "pending"  # pending, ready_to_pack, picked_up, out_for_delivery, delivered
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+class OrderItemWithOffer(BaseModel):
+    id: str
+    offer_id: str
+    retailer_id: str
+    retailer_name: str
+    zone_id: str
+    zone_name: str
+    product_id: str
+    product_name: str
+    product_brand: str
+    product_unit: str
+    supplier_id: str
+    supplier_name: str
+    supplier_code: str
+    quantity: int
+    price_per_unit: float
+    total_amount: float
+    status: str
+    offer_status: str
+    offer_aggregated_qty: int
+    offer_min_fulfillment_qty: int
+    offer_progress_percentage: float
+    created_at: datetime
+
 # ===================== UTILITIES =====================
 
 def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
