@@ -43,6 +43,14 @@ interface Zone {
   name: string;
 }
 
+interface Category {
+  id: string;
+  name: string;
+  parent_id?: string;
+  description?: string;
+  product_count?: number;
+}
+
 interface QuantitySlab {
   min_qty: number;
   max_qty: number | null;
@@ -54,6 +62,7 @@ export default function CatalogManagementScreen() {
   const [products, setProducts] = useState<Product[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [zones, setZones] = useState<Zone[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   
@@ -66,6 +75,12 @@ export default function CatalogManagementScreen() {
   const [productCategory, setProductCategory] = useState('');
   const [productImages, setProductImages] = useState<string[]>([]);
   const [imageUrlInput, setImageUrlInput] = useState('');
+  
+  // Category Modal
+  const [categoryModalVisible, setCategoryModalVisible] = useState(false);
+  const [categoryName, setCategoryName] = useState('');
+  const [categoryDescription, setCategoryDescription] = useState('');
+  const [parentCategory, setParentCategory] = useState<string | null>(null);
   
   // Offer Modal
   const [offerModalVisible, setOfferModalVisible] = useState(false);
@@ -80,19 +95,21 @@ export default function CatalogManagementScreen() {
     { min_qty: 51, max_qty: null, price_per_unit: 80 },
   ]);
 
-  const [activeTab, setActiveTab] = useState<'products' | 'offers'>('products');
+  const [activeTab, setActiveTab] = useState<'products' | 'offers' | 'categories'>('products');
   const [submitting, setSubmitting] = useState(false);
 
   const fetchData = async () => {
     try {
-      const [productsData, suppliersData, zonesData] = await Promise.all([
+      const [productsData, suppliersData, zonesData, categoriesData] = await Promise.all([
         api.getProducts(),
         api.getSuppliers(),
         api.getAllZones(),
+        api.getCategories(),
       ]);
       setProducts(productsData);
       setSuppliers(suppliersData);
       setZones(zonesData);
+      setCategories(categoriesData);
     } catch (error) {
       console.error('Failed to fetch data:', error);
     } finally {
@@ -126,7 +143,7 @@ export default function CatalogManagementScreen() {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.7,
@@ -150,7 +167,6 @@ export default function CatalogManagementScreen() {
       return;
     }
 
-    // Basic URL validation
     if (!imageUrlInput.startsWith('http://') && !imageUrlInput.startsWith('https://')) {
       Alert.alert('Error', 'Please enter a valid URL starting with http:// or https://');
       return;
@@ -199,6 +215,59 @@ export default function CatalogManagementScreen() {
     setProductCategory('');
     setProductImages([]);
     setImageUrlInput('');
+  };
+
+  const handleAddCategory = async () => {
+    if (!categoryName.trim()) {
+      Alert.alert('Error', 'Please enter a category name');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await api.createCategory({
+        name: categoryName.trim(),
+        parent_id: parentCategory || undefined,
+        description: categoryDescription.trim() || undefined,
+      });
+      Alert.alert('Success', 'Category created successfully');
+      setCategoryModalVisible(false);
+      resetCategoryForm();
+      fetchData();
+    } catch (error: any) {
+      Alert.alert('Error', error.response?.data?.detail || 'Failed to create category');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const resetCategoryForm = () => {
+    setCategoryName('');
+    setCategoryDescription('');
+    setParentCategory(null);
+  };
+
+  const handleDeleteCategory = async (categoryId: string, categoryName: string) => {
+    Alert.alert(
+      'Delete Category',
+      `Are you sure you want to delete "${categoryName}"? This action cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await api.deleteCategory(categoryId);
+              Alert.alert('Success', 'Category deleted');
+              fetchData();
+            } catch (error: any) {
+              Alert.alert('Error', error.response?.data?.detail || 'Failed to delete category');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleCreateOffer = async () => {
@@ -274,6 +343,11 @@ export default function CatalogManagementScreen() {
     }
   };
 
+  const getCategoryColor = (index: number) => {
+    const colors = ['#6c5ce7', '#e74c3c', '#27ae60', '#f39c12', '#3498db', '#9b59b6'];
+    return colors[index % colors.length];
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -295,6 +369,14 @@ export default function CatalogManagementScreen() {
         >
           <Text style={[styles.tabText, activeTab === 'products' && styles.tabTextActive]}>
             Products ({products.length})
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'categories' && styles.tabActive]}
+          onPress={() => setActiveTab('categories')}
+        >
+          <Text style={[styles.tabText, activeTab === 'categories' && styles.tabTextActive]}>
+            Categories ({categories.length})
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -362,6 +444,61 @@ export default function CatalogManagementScreen() {
                 </TouchableOpacity>
               </View>
             ))}
+          </>
+        ) : activeTab === 'categories' ? (
+          <>
+            {/* Add Category Button */}
+            <TouchableOpacity
+              style={[styles.addButton, { backgroundColor: '#6c5ce7' }]}
+              onPress={() => setCategoryModalVisible(true)}
+            >
+              <Ionicons name="folder-open" size={24} color="#fff" />
+              <Text style={styles.addButtonText}>Add New Category</Text>
+            </TouchableOpacity>
+
+            {/* Category Info */}
+            <View style={styles.infoCard}>
+              <Ionicons name="information-circle" size={20} color="#6c5ce7" />
+              <Text style={styles.infoText}>
+                Categories help organize products. When adding a product, you can select from these categories.
+              </Text>
+            </View>
+
+            {/* Categories List */}
+            {categories.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="folder-open-outline" size={64} color="#666" />
+                <Text style={styles.emptyTitle}>No Categories</Text>
+                <Text style={styles.emptySubtitle}>
+                  Create your first category to organize products
+                </Text>
+              </View>
+            ) : (
+              categories.map((category, index) => (
+                <View key={category.id} style={styles.categoryCard}>
+                  <View style={[styles.categoryIcon, { backgroundColor: getCategoryColor(index) + '20' }]}>
+                    <Ionicons name="folder" size={24} color={getCategoryColor(index)} />
+                  </View>
+                  <View style={styles.categoryInfo}>
+                    <Text style={styles.categoryName}>{category.name}</Text>
+                    {category.description && (
+                      <Text style={styles.categoryDescription}>{category.description}</Text>
+                    )}
+                    {category.parent_id && (
+                      <Text style={styles.categoryParent}>
+                        Parent: {categories.find(c => c.id === category.parent_id)?.name || 'Unknown'}
+                      </Text>
+                    )}
+                  </View>
+                  <TouchableOpacity
+                    style={styles.deleteBtn}
+                    onPress={() => handleDeleteCategory(category.id, category.name)}
+                  >
+                    <Ionicons name="trash-outline" size={20} color="#e74c3c" />
+                  </TouchableOpacity>
+                </View>
+              ))
+            )}
           </>
         ) : (
           <>
@@ -595,13 +732,35 @@ export default function CatalogManagementScreen() {
 
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Category *</Text>
-                <TextInput
-                  style={styles.input}
-                  value={productCategory}
-                  onChangeText={setProductCategory}
-                  placeholder="e.g., Grocery, Snacks, Personal Care"
-                  placeholderTextColor="#666"
-                />
+                {categories.length > 0 ? (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categorySelectScroll}>
+                    {categories.map((cat) => (
+                      <TouchableOpacity
+                        key={cat.id}
+                        style={[
+                          styles.categorySelectChip,
+                          productCategory === cat.name && styles.categorySelectChipActive,
+                        ]}
+                        onPress={() => setProductCategory(cat.name)}
+                      >
+                        <Text style={[
+                          styles.categorySelectText,
+                          productCategory === cat.name && styles.categorySelectTextActive,
+                        ]}>
+                          {cat.name}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                ) : (
+                  <TextInput
+                    style={styles.input}
+                    value={productCategory}
+                    onChangeText={setProductCategory}
+                    placeholder="e.g., Grocery, Snacks, Personal Care"
+                    placeholderTextColor="#666"
+                  />
+                )}
               </View>
 
               <View style={styles.inputGroup}>
@@ -709,6 +868,107 @@ export default function CatalogManagementScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Add Category Modal */}
+      <Modal
+        visible={categoryModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setCategoryModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <View style={[styles.modalContent, { paddingBottom: insets.bottom + 24 }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Add New Category</Text>
+              <TouchableOpacity onPress={() => {
+                setCategoryModalVisible(false);
+                resetCategoryForm();
+              }}>
+                <Ionicons name="close" size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Category Name *</Text>
+              <TextInput
+                style={styles.input}
+                value={categoryName}
+                onChangeText={setCategoryName}
+                placeholder="e.g., Grocery, Electronics, Personal Care"
+                placeholderTextColor="#666"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Description (Optional)</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                value={categoryDescription}
+                onChangeText={setCategoryDescription}
+                placeholder="Brief description of the category"
+                placeholderTextColor="#666"
+                multiline
+                numberOfLines={3}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Parent Category (Optional)</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categorySelectScroll}>
+                <TouchableOpacity
+                  style={[
+                    styles.categorySelectChip,
+                    parentCategory === null && styles.categorySelectChipActive,
+                  ]}
+                  onPress={() => setParentCategory(null)}
+                >
+                  <Text style={[
+                    styles.categorySelectText,
+                    parentCategory === null && styles.categorySelectTextActive,
+                  ]}>
+                    None (Top Level)
+                  </Text>
+                </TouchableOpacity>
+                {categories.map((cat) => (
+                  <TouchableOpacity
+                    key={cat.id}
+                    style={[
+                      styles.categorySelectChip,
+                      parentCategory === cat.id && styles.categorySelectChipActive,
+                    ]}
+                    onPress={() => setParentCategory(cat.id)}
+                  >
+                    <Text style={[
+                      styles.categorySelectText,
+                      parentCategory === cat.id && styles.categorySelectTextActive,
+                    ]}>
+                      {cat.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+
+            <TouchableOpacity 
+              style={[styles.submitButton, { backgroundColor: '#6c5ce7' }, submitting && styles.submitButtonDisabled]} 
+              onPress={handleAddCategory}
+              disabled={submitting}
+            >
+              {submitting ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <>
+                  <Ionicons name="folder-open" size={20} color="#fff" />
+                  <Text style={styles.submitButtonText}>Create Category</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -745,7 +1005,7 @@ const styles = StyleSheet.create({
   },
   tabText: {
     color: '#666',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
   },
   tabTextActive: {
@@ -769,6 +1029,38 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  infoCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: 'rgba(108, 92, 231, 0.1)',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 16,
+    gap: 8,
+  },
+  infoText: {
+    color: '#a0a0a0',
+    fontSize: 13,
+    flex: 1,
+    lineHeight: 18,
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 48,
+  },
+  emptyTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginTop: 16,
+  },
+  emptySubtitle: {
+    color: '#a0a0a0',
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 8,
   },
   productCard: {
     flexDirection: 'row',
@@ -820,6 +1112,48 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     backgroundColor: 'rgba(39, 174, 96, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  categoryCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1a1a2e',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 8,
+  },
+  categoryIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  categoryInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  categoryName: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  categoryDescription: {
+    color: '#a0a0a0',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  categoryParent: {
+    color: '#666',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  deleteBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(231, 76, 60, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -900,6 +1234,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     borderWidth: 1,
     borderColor: '#2d2d44',
+  },
+  textArea: {
+    height: 80,
+    textAlignVertical: 'top',
   },
   slabHeader: {
     flexDirection: 'row',
@@ -994,6 +1332,29 @@ const styles = StyleSheet.create({
   inputGroup: {
     marginBottom: 16,
   },
+  categorySelectScroll: {
+    marginTop: 8,
+  },
+  categorySelectChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: '#0f0f1a',
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#2d2d44',
+  },
+  categorySelectChipActive: {
+    backgroundColor: '#6c5ce7',
+    borderColor: '#6c5ce7',
+  },
+  categorySelectText: {
+    color: '#a0a0a0',
+    fontSize: 14,
+  },
+  categorySelectTextActive: {
+    color: '#fff',
+  },
   unitSelection: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1018,7 +1379,6 @@ const styles = StyleSheet.create({
   unitChipTextActive: {
     color: '#fff',
   },
-  // Image related styles
   imagePreviewScroll: {
     marginBottom: 12,
   },
