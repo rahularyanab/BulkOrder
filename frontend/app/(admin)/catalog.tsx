@@ -1187,6 +1187,55 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginTop: 2,
   },
+  subcategoryCount: {
+    color: '#6c5ce7',
+    fontSize: 11,
+    marginTop: 4,
+  },
+  subcategoriesContainer: {
+    marginLeft: 24,
+    marginBottom: 8,
+  },
+  subcategoryCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#151525',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 4,
+  },
+  subcategoryConnector: {
+    width: 16,
+    alignItems: 'center',
+  },
+  connectorLine: {
+    width: 2,
+    height: 24,
+    backgroundColor: '#2d2d44',
+    position: 'absolute',
+    top: -16,
+  },
+  subcategoryIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  subcategoryInfo: {
+    flex: 1,
+    marginLeft: 10,
+  },
+  subcategoryName: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  subcategoryDescription: {
+    color: '#666',
+    fontSize: 11,
+    marginTop: 2,
+  },
   deleteBtn: {
     width: 40,
     height: 40,
