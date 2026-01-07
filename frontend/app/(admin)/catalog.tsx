@@ -89,6 +89,10 @@ export default function CatalogManagementScreen() {
   const [categoryDescription, setCategoryDescription] = useState('');
   const [parentCategory, setParentCategory] = useState<string | null>(null);
   
+  // Offer - Product Search
+  const [productSearchQuery, setProductSearchQuery] = useState('');
+  const [showProductResults, setShowProductResults] = useState(false);
+  
   // Offer Modal
   const [offerModalVisible, setOfferModalVisible] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
