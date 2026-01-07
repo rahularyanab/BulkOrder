@@ -97,7 +97,7 @@ export default function CatalogScreen() {
       setOffers(data);
       
       // Extract unique categories
-      const uniqueCategories = [...new Set(data.map((o: SupplierOffer) => o.product_category))];
+      const uniqueCategories: string[] = [...new Set(data.map((o: SupplierOffer) => o.product_category))];
       setCategories(uniqueCategories);
     } catch (error) {
       console.error('Failed to fetch offers:', error);
