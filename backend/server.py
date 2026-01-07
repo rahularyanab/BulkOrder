@@ -1285,8 +1285,8 @@ async def create_order_for_retailer(retailer_id: str, offer_id: str, quantity: i
             price_per_unit = slab["price_per_unit"]
             break
     
-    # Create the order
-    order = Order(
+    # Create the order using OrderItem model
+    order = OrderItem(
         retailer_id=retailer_id,
         offer_id=offer_id,
         quantity=quantity,
