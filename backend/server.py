@@ -786,14 +786,23 @@ async def get_offer_details(offer_id: str, user=Depends(get_current_user)):
     
     progress = (offer["current_aggregated_qty"] / offer["min_fulfillment_qty"]) * 100 if offer["min_fulfillment_qty"] > 0 else 0
     
+    # Get category name - support both category_id and category string
+    category_name = product.get("category", "Uncategorized")
+    if product.get("category_id"):
+        category = await db.categories.find_one({"id": product.get("category_id")})
+        if category:
+            category_name = category["name"]
+    
     return SupplierOfferWithDetails(
         id=offer["id"],
         product_id=offer["product_id"],
         product_name=product["name"],
         product_brand=product["brand"],
         product_unit=product["unit"],
-        product_category=product["category"],
-        product_image=product.get("image_base64"),
+        product_category=category_name,
+        product_category_id=product.get("category_id"),
+        product_category_name=category_name,
+        product_images=product.get("images", []),
         supplier_id=offer["supplier_id"],
         supplier_name=supplier["name"],
         supplier_code=supplier["code"],
