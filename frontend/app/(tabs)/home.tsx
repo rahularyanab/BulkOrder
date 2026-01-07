@@ -116,10 +116,6 @@ export default function HomeScreen() {
               <Ionicons name="add-circle" size={32} color="#6c5ce7" />
               <Text style={styles.actionText}>New Order</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/(tabs)/catalog')}>
-              <Ionicons name="grid" size={32} color="#27ae60" />
-              <Text style={styles.actionText}>View Catalog</Text>
-            </TouchableOpacity>
             <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/(tabs)/orders')}>
               <Ionicons name="time" size={32} color="#f39c12" />
               <Text style={styles.actionText}>Order History</Text>
