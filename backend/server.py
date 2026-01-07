@@ -478,6 +478,30 @@ async def verify_otp(request: OTPVerify):
         retailer_id=retailer_id
     )
 
+# Admin password login
+ADMIN_PHONE = "9999999999"
+ADMIN_PASSWORD = "Password123"
+
+@api_router.post("/auth/admin-login")
+async def admin_password_login(phone: str, password: str):
+    """Admin login with password"""
+    if phone != ADMIN_PHONE:
+        raise HTTPException(status_code=401, detail="Invalid admin credentials")
+    
+    if password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Invalid password")
+    
+    # Create admin token
+    access_token = create_access_token({"sub": phone, "is_admin": True})
+    
+    logger.info(f"Admin logged in with password")
+    
+    return {
+        "token": access_token,
+        "is_admin": True
+    }
+
+
 # ===================== RETAILER ENDPOINTS =====================
 
 @api_router.post("/retailers", response_model=Retailer)
