@@ -138,30 +138,44 @@ export default function CatalogScreen() {
     setOfferModalVisible(true);
   };
 
-  const handleAddToOrder = () => {
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleAddToOrder = async () => {
     const qty = parseInt(orderQuantity);
     if (!qty || qty <= 0) {
       Alert.alert('Invalid Quantity', 'Please enter a valid quantity greater than 0');
       return;
     }
 
-    if (selectedOffer) {
-      const price = getCurrentPrice(selectedOffer.quantity_slabs, qty);
-      const total = price * qty;
-      
-      Alert.alert(
-        'Order Added',
-        `Added ${qty} ${selectedOffer.product_unit} of ${selectedOffer.product_name}\n\nPrice: ₹${price}/${selectedOffer.product_unit}\nTotal: ₹${total}`,
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              setOfferModalVisible(false);
-              setOrderQuantity('');
+    if (selectedOffer && !submitting) {
+      setSubmitting(true);
+      try {
+        const result = await api.createOrder(selectedOffer.id, qty);
+        
+        Alert.alert(
+          'Order Placed!',
+          `Added ${qty} ${selectedOffer.product_unit} of ${selectedOffer.product_name}\n\n` +
+          `Price: ₹${result.price_per_unit}/${selectedOffer.product_unit}\n` +
+          `Your Total: ₹${result.total_amount}\n\n` +
+          `Zone Total: ${result.new_aggregated_qty} ${selectedOffer.product_unit}\n` +
+          (result.offer_status === 'ready_to_pack' ? '🎉 Minimum quantity reached! Ready to pack!' : ''),
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                setOfferModalVisible(false);
+                setOrderQuantity('');
+                fetchOffers(); // Refresh offers to show updated aggregated qty
+              },
             },
-          },
-        ]
-      );
+          ]
+        );
+      } catch (error: any) {
+        Alert.alert('Error', error.response?.data?.detail || 'Failed to place order');
+      } finally {
+        setSubmitting(false);
+      }
+    }
     }
   };
 
