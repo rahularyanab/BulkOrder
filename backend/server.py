@@ -144,16 +144,18 @@ class ProductCreate(BaseModel):
     brand: str
     barcode: Optional[str] = None
     unit: str  # e.g., "kg", "piece", "pack", "litre"
-    category_id: str  # Reference to category
+    category: Optional[str] = None  # Backward compatible - category name as string
+    category_id: Optional[str] = None  # Reference to category
     subcategory_id: Optional[str] = None  # Reference to subcategory
     description: Optional[str] = None
-    images: Optional[List[str]] = []  # Up to 3 base64 images
+    images: Optional[List[str]] = []  # Up to 3 image URLs or base64
 
 class ProductUpdate(BaseModel):
     name: Optional[str] = None
     brand: Optional[str] = None
     barcode: Optional[str] = None
     unit: Optional[str] = None
+    category: Optional[str] = None
     category_id: Optional[str] = None
     subcategory_id: Optional[str] = None
     description: Optional[str] = None
@@ -165,10 +167,11 @@ class Product(BaseModel):
     brand: str
     barcode: Optional[str] = None
     unit: str
-    category_id: str
+    category: Optional[str] = None  # Backward compatible - category name
+    category_id: Optional[str] = None
     subcategory_id: Optional[str] = None
     description: Optional[str] = None
-    images: List[str] = []  # Up to 3 base64 images
+    images: List[str] = []  # Up to 3 image URLs or base64
     is_active: bool = True
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
