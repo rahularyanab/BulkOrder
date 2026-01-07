@@ -31,7 +31,7 @@ interface SupplierOffer {
   product_brand: string;
   product_unit: string;
   product_category: string;
-  product_image: string | null;
+  product_images: string[];
   supplier_id: string;
   supplier_name: string;
   supplier_code: string;
