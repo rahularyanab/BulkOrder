@@ -482,27 +482,58 @@ export default function CatalogManagementScreen() {
               </View>
             ) : (
               categories.map((category, index) => (
-                <View key={category.id} style={styles.categoryCard}>
-                  <View style={[styles.categoryIcon, { backgroundColor: getCategoryColor(index) + '20' }]}>
-                    <Ionicons name="folder" size={24} color={getCategoryColor(index)} />
+                <View key={category.id}>
+                  {/* Parent Category */}
+                  <View style={styles.categoryCard}>
+                    <View style={[styles.categoryIcon, { backgroundColor: getCategoryColor(index) + '20' }]}>
+                      <Ionicons name="folder" size={24} color={getCategoryColor(index)} />
+                    </View>
+                    <View style={styles.categoryInfo}>
+                      <Text style={styles.categoryName}>{category.name}</Text>
+                      {category.description && (
+                        <Text style={styles.categoryDescription}>{category.description}</Text>
+                      )}
+                      {category.subcategories && category.subcategories.length > 0 && (
+                        <Text style={styles.subcategoryCount}>
+                          {category.subcategories.length} subcategories
+                        </Text>
+                      )}
+                    </View>
+                    <TouchableOpacity
+                      style={styles.deleteBtn}
+                      onPress={() => handleDeleteCategory(category.id, category.name)}
+                    >
+                      <Ionicons name="trash-outline" size={20} color="#e74c3c" />
+                    </TouchableOpacity>
                   </View>
-                  <View style={styles.categoryInfo}>
-                    <Text style={styles.categoryName}>{category.name}</Text>
-                    {category.description && (
-                      <Text style={styles.categoryDescription}>{category.description}</Text>
-                    )}
-                    {category.parent_id && (
-                      <Text style={styles.categoryParent}>
-                        Parent: {categories.find(c => c.id === category.parent_id)?.name || 'Unknown'}
-                      </Text>
-                    )}
-                  </View>
-                  <TouchableOpacity
-                    style={styles.deleteBtn}
-                    onPress={() => handleDeleteCategory(category.id, category.name)}
-                  >
-                    <Ionicons name="trash-outline" size={20} color="#e74c3c" />
-                  </TouchableOpacity>
+                  
+                  {/* Subcategories */}
+                  {category.subcategories && category.subcategories.length > 0 && (
+                    <View style={styles.subcategoriesContainer}>
+                      {category.subcategories.map((sub) => (
+                        <View key={sub.id} style={styles.subcategoryCard}>
+                          <View style={styles.subcategoryConnector}>
+                            <View style={styles.connectorLine} />
+                          </View>
+                          <View style={[styles.subcategoryIcon, { backgroundColor: getCategoryColor(index) + '15' }]}>
+                            <Ionicons name="folder-outline" size={18} color={getCategoryColor(index)} />
+                          </View>
+                          <View style={styles.subcategoryInfo}>
+                            <Text style={styles.subcategoryName}>{sub.name}</Text>
+                            {sub.description && (
+                              <Text style={styles.subcategoryDescription}>{sub.description}</Text>
+                            )}
+                          </View>
+                          <TouchableOpacity
+                            style={styles.deleteBtn}
+                            onPress={() => handleDeleteCategory(sub.id, sub.name)}
+                          >
+                            <Ionicons name="trash-outline" size={16} color="#e74c3c" />
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </View>
+                  )}
                 </View>
               ))
             )}
