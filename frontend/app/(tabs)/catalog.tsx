@@ -734,14 +734,47 @@ export default function CatalogScreen() {
                 </View>
 
                 <Text style={styles.slabTitle}>Price Slabs</Text>
-                {selectedOffer.quantity_slabs.map((slab, idx) => (
-                  <View key={idx} style={styles.slabRow}>
-                    <Text style={styles.slabQty}>
-                      {slab.min_qty} - {slab.max_qty || '∞'} {selectedOffer.product_unit}
-                    </Text>
-                    <Text style={styles.slabPrice}>₹{slab.price_per_unit}/{selectedOffer.product_unit}</Text>
-                  </View>
-                ))}
+                <Text style={styles.slabSubtitle}>
+                  Currently at {selectedOffer.current_aggregated_qty} {selectedOffer.product_unit} (zone total)
+                </Text>
+                {selectedOffer.quantity_slabs.map((slab, idx) => {
+                  const isCurrentSlab = idx === getCurrentSlabIndex(selectedOffer.quantity_slabs, selectedOffer.current_aggregated_qty);
+                  const isAchieved = selectedOffer.current_aggregated_qty >= slab.min_qty;
+                  
+                  return (
+                    <View 
+                      key={idx} 
+                      style={[
+                        styles.slabRow,
+                        isCurrentSlab && styles.slabRowCurrent,
+                      ]}
+                    >
+                      <View style={styles.slabRowLeft}>
+                        {isCurrentSlab && (
+                          <Ionicons name="arrow-forward" size={14} color="#6c5ce7" style={styles.slabArrow} />
+                        )}
+                        <Text style={[styles.slabQty, isCurrentSlab && styles.slabQtyCurrent]}>
+                          {slab.min_qty} - {slab.max_qty || '∞'} {selectedOffer.product_unit}
+                        </Text>
+                      </View>
+                      <View style={styles.slabRowRight}>
+                        <Text style={[styles.slabPrice, isCurrentSlab && styles.slabPriceCurrent]}>
+                          ₹{slab.price_per_unit}/{selectedOffer.product_unit}
+                        </Text>
+                        {isCurrentSlab && (
+                          <View style={styles.currentSlabTag}>
+                            <Text style={styles.currentSlabTagText}>CURRENT</Text>
+                          </View>
+                        )}
+                        {!isAchieved && idx > 0 && (
+                          <Text style={styles.slabSavings}>
+                            Save ₹{selectedOffer.quantity_slabs[idx-1].price_per_unit - slab.price_per_unit}/unit
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                  );
+                })}
 
                 <View style={styles.fulfillmentInfo}>
                   <Ionicons name="information-circle" size={20} color="#6c5ce7" />
