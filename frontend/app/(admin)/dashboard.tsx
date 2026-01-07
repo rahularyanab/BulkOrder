@@ -7,11 +7,13 @@ import {
   RefreshControl,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { api } from '../../src/services/api';
+import { useAuth } from '../../src/context/AuthContext';
 
 interface DashboardStats {
   offers: {
