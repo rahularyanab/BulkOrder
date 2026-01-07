@@ -1412,24 +1412,71 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+    marginBottom: 4,
+  },
+  slabSubtitle: {
+    color: '#a0a0a0',
+    fontSize: 12,
     marginBottom: 12,
   },
   slabRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     backgroundColor: '#0f0f1a',
     padding: 12,
     borderRadius: 8,
     marginBottom: 8,
   },
+  slabRowCurrent: {
+    backgroundColor: 'rgba(108, 92, 231, 0.15)',
+    borderWidth: 1,
+    borderColor: '#6c5ce7',
+  },
+  slabRowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  slabArrow: {
+    marginRight: 8,
+  },
+  slabRowRight: {
+    alignItems: 'flex-end',
+  },
   slabQty: {
     color: '#a0a0a0',
     fontSize: 14,
+  },
+  slabQtyCurrent: {
+    color: '#fff',
+    fontWeight: '600',
   },
   slabPrice: {
     color: '#27ae60',
     fontSize: 14,
     fontWeight: '600',
+  },
+  slabPriceCurrent: {
+    color: '#6c5ce7',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  currentSlabTag: {
+    backgroundColor: '#6c5ce7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginTop: 4,
+  },
+  currentSlabTagText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: 'bold',
+  },
+  slabSavings: {
+    color: '#27ae60',
+    fontSize: 10,
+    marginTop: 2,
   },
   fulfillmentInfo: {
     flexDirection: 'row',
