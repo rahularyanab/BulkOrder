@@ -102,6 +102,32 @@ class ApiService {
     return response.data;
   }
 
+  // Admin product management
+  async createProduct(data: {
+    name: string;
+    brand: string;
+    barcode?: string;
+    unit: string;
+    category: string;
+    description?: string;
+  }) {
+    const response = await this.client.post('/admin/products', data);
+    return response.data;
+  }
+
+  // Admin offer management  
+  async createOffer(data: {
+    product_id: string;
+    supplier_id: string;
+    zone_id: string;
+    quantity_slabs: Array<{ min_qty: number; max_qty: number | null; price_per_unit: number }>;
+    min_fulfillment_qty: number;
+    lead_time_days: number;
+  }) {
+    const response = await this.client.post('/admin/offers', data);
+    return response.data;
+  }
+
   // Offer endpoints
   async getZoneOffers(zoneId: string) {
     const response = await this.client.get(`/offers/zone/${zoneId}`);
