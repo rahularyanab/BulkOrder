@@ -108,8 +108,13 @@ export default function AdminDashboard() {
         }
       >
         <View style={styles.header}>
-          <Ionicons name="shield-checkmark" size={40} color="#e74c3c" />
-          <Text style={styles.headerTitle}>Admin Dashboard</Text>
+          <View style={styles.headerLeft}>
+            <Ionicons name="shield-checkmark" size={40} color="#e74c3c" />
+            <Text style={styles.headerTitle}>Admin Dashboard</Text>
+          </View>
+          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+            <Ionicons name="log-out-outline" size={24} color="#e74c3c" />
+          </TouchableOpacity>
         </View>
 
         {/* Offers Stats */}
