@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,11 +12,13 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
 import { api } from '../../src/services/api';
+import { useFocusEffect } from 'expo-router';
 
 interface QuantitySlab {
   min_qty: number;
@@ -45,6 +47,16 @@ interface SupplierOffer {
   progress_percentage: number;
 }
 
+interface Product {
+  id: string;
+  name: string;
+  brand: string;
+  unit: string;
+  category: string;
+  category_name?: string;
+  images: string[];
+}
+
 interface Zone {
   id: string;
   name: string;
@@ -53,25 +65,48 @@ interface Zone {
 export default function CatalogScreen() {
   const { retailer } = useAuth();
   const insets = useSafeAreaInsets();
+  
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'active' | 'browse'>('active');
+  
+  // Zone state
   const [zones, setZones] = useState<Zone[]>([]);
   const [selectedZone, setSelectedZone] = useState<Zone | null>(null);
+  const [zoneModalVisible, setZoneModalVisible] = useState(false);
+  
+  // Offers & Products state
   const [offers, setOffers] = useState<SupplierOffer[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [zoneModalVisible, setZoneModalVisible] = useState(false);
-  const [selectedOffer, setSelectedOffer] = useState<SupplierOffer | null>(null);
-  const [offerModalVisible, setOfferModalVisible] = useState(false);
+  
+  // Filter & Search state
+  const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState<string | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
+  
+  // Offer Modal state
+  const [selectedOffer, setSelectedOffer] = useState<SupplierOffer | null>(null);
+  const [offerModalVisible, setOfferModalVisible] = useState(false);
   const [orderQuantity, setOrderQuantity] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  
+  // Bid Request Modal state
+  const [bidModalVisible, setBidModalVisible] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [bidQuantity, setBidQuantity] = useState('');
+  const [bidNotes, setBidNotes] = useState('');
 
-  useEffect(() => {
-    fetchZones();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchZones();
+    }, [])
+  );
 
   useEffect(() => {
     if (selectedZone) {
       fetchOffers();
+      fetchProducts();
     }
   }, [selectedZone]);
 
@@ -79,7 +114,7 @@ export default function CatalogScreen() {
     try {
       const data = await api.getRetailerZones();
       setZones(data);
-      if (data.length > 0) {
+      if (data.length > 0 && !selectedZone) {
         setSelectedZone(data[0]);
       }
     } catch (error) {
@@ -107,9 +142,18 @@ export default function CatalogScreen() {
     }
   };
 
+  const fetchProducts = async () => {
+    try {
+      const data = await api.getProducts();
+      setProducts(data);
+    } catch (error) {
+      console.error('Failed to fetch products:', error);
+    }
+  };
+
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchOffers();
+    await Promise.all([fetchOffers(), fetchProducts()]);
     setRefreshing(false);
   };
 
@@ -141,7 +185,12 @@ export default function CatalogScreen() {
     setOfferModalVisible(true);
   };
 
-  const [submitting, setSubmitting] = useState(false);
+  const openBidModal = (product: Product) => {
+    setSelectedProduct(product);
+    setBidQuantity('');
+    setBidNotes('');
+    setBidModalVisible(true);
+  };
 
   const handleAddToOrder = async () => {
     const qty = parseInt(orderQuantity);
@@ -168,7 +217,7 @@ export default function CatalogScreen() {
               onPress: () => {
                 setOfferModalVisible(false);
                 setOrderQuantity('');
-                fetchOffers(); // Refresh offers to show updated aggregated qty
+                fetchOffers();
               },
             },
           ]
@@ -178,6 +227,45 @@ export default function CatalogScreen() {
       } finally {
         setSubmitting(false);
       }
+    }
+  };
+
+  const handleRequestBid = async () => {
+    if (!selectedProduct || !selectedZone) return;
+    
+    const qty = parseInt(bidQuantity);
+    if (!qty || qty <= 0) {
+      Alert.alert('Invalid Quantity', 'Please enter how much quantity you need');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await api.createBidRequest({
+        product_id: selectedProduct.id,
+        zone_id: selectedZone.id,
+        requested_quantity: qty,
+        notes: bidNotes || undefined,
+      });
+      
+      Alert.alert(
+        'Bid Request Submitted!',
+        `Your request for ${selectedProduct.name} has been submitted.\n\nWe'll notify you when a supplier offer is available.`,
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              setBidModalVisible(false);
+              setBidQuantity('');
+              setBidNotes('');
+            },
+          },
+        ]
+      );
+    } catch (error: any) {
+      Alert.alert('Error', error.response?.data?.detail || 'Failed to submit bid request');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -193,11 +281,32 @@ export default function CatalogScreen() {
     }
   };
 
-  const filteredOffers = filterCategory
-    ? offers.filter(o => o.product_category === filterCategory)
-    : offers;
+  // Filter offers based on search and category
+  const filteredOffers = offers.filter(o => {
+    const matchesSearch = !searchQuery || 
+      o.product_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      o.product_brand.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = !filterCategory || o.product_category === filterCategory;
+    return matchesSearch && matchesCategory;
+  });
 
-  const renderOfferCard = (offer: SupplierOffer) => (
+  // Active bids = offers with current_aggregated_qty > 0
+  const activeBids = filteredOffers.filter(o => o.current_aggregated_qty > 0);
+  
+  // All offers for browsing
+  const browseOffers = filteredOffers;
+
+  // Products without active offers in this zone
+  const productsWithoutOffers = products.filter(p => 
+    !offers.some(o => o.product_id === p.id)
+  ).filter(p => {
+    const matchesSearch = !searchQuery || 
+      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.brand.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesSearch;
+  });
+
+  const renderOfferCard = (offer: SupplierOffer, showBidStatus: boolean = false) => (
     <TouchableOpacity
       key={offer.id}
       style={styles.offerCard}
@@ -205,9 +314,13 @@ export default function CatalogScreen() {
     >
       <View style={styles.offerHeader}>
         <View style={styles.productInfo}>
-          <View style={styles.productIcon}>
-            <Ionicons name="cube" size={24} color="#6c5ce7" />
-          </View>
+          {offer.product_images && offer.product_images.length > 0 ? (
+            <Image source={{ uri: offer.product_images[0] }} style={styles.productImage} />
+          ) : (
+            <View style={styles.productIcon}>
+              <Ionicons name="cube" size={24} color="#6c5ce7" />
+            </View>
+          )}
           <View style={styles.productDetails}>
             <Text style={styles.productName}>{offer.product_name}</Text>
             <Text style={styles.productBrand}>{offer.product_brand}</Text>
@@ -254,8 +367,40 @@ export default function CatalogScreen() {
             <Text style={styles.readyText}>Ready to Pack</Text>
           </View>
         )}
+        {showBidStatus && offer.current_aggregated_qty > 0 && offer.status !== 'ready_to_pack' && (
+          <View style={styles.activeBidBadge}>
+            <Ionicons name="flame" size={14} color="#f39c12" />
+            <Text style={styles.activeBidText}>Active Group Bid</Text>
+          </View>
+        )}
       </View>
     </TouchableOpacity>
+  );
+
+  const renderProductCard = (product: Product) => (
+    <View key={product.id} style={styles.productCard}>
+      <View style={styles.productCardHeader}>
+        {product.images && product.images.length > 0 ? (
+          <Image source={{ uri: product.images[0] }} style={styles.productImage} />
+        ) : (
+          <View style={styles.productIcon}>
+            <Ionicons name="cube" size={24} color="#6c5ce7" />
+          </View>
+        )}
+        <View style={styles.productCardInfo}>
+          <Text style={styles.productName}>{product.name}</Text>
+          <Text style={styles.productBrand}>{product.brand} • {product.category_name || product.category}</Text>
+          <Text style={styles.productUnit}>Unit: {product.unit}</Text>
+        </View>
+      </View>
+      <TouchableOpacity
+        style={styles.requestBidButton}
+        onPress={() => openBidModal(product)}
+      >
+        <Ionicons name="hand-left" size={16} color="#fff" />
+        <Text style={styles.requestBidText}>Request Bid</Text>
+      </TouchableOpacity>
+    </View>
   );
 
   if (loading) {
@@ -283,51 +428,141 @@ export default function CatalogScreen() {
         <Ionicons name="chevron-down" size={20} color="#666" />
       </TouchableOpacity>
 
-      {/* Category Filter */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.categoryScroll}
-        contentContainerStyle={styles.categoryContainer}
-      >
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <Ionicons name="search" size={20} color="#666" />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search products..."
+          placeholderTextColor="#666"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <Ionicons name="close-circle" size={20} color="#666" />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Tab Selector */}
+      <View style={styles.tabContainer}>
         <TouchableOpacity
-          style={[styles.categoryChip, !filterCategory && styles.categoryChipActive]}
-          onPress={() => setFilterCategory(null)}
+          style={[styles.tab, activeTab === 'active' && styles.tabActive]}
+          onPress={() => setActiveTab('active')}
         >
-          <Text style={[styles.categoryText, !filterCategory && styles.categoryTextActive]}>
-            All
+          <Ionicons 
+            name="flame" 
+            size={18} 
+            color={activeTab === 'active' ? '#fff' : '#666'} 
+          />
+          <Text style={[styles.tabText, activeTab === 'active' && styles.tabTextActive]}>
+            Active Bids ({activeBids.length})
           </Text>
         </TouchableOpacity>
-        {categories.map((cat) => (
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'browse' && styles.tabActive]}
+          onPress={() => setActiveTab('browse')}
+        >
+          <Ionicons 
+            name="grid" 
+            size={18} 
+            color={activeTab === 'browse' ? '#fff' : '#666'} 
+          />
+          <Text style={[styles.tabText, activeTab === 'browse' && styles.tabTextActive]}>
+            Browse All
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Category Filter */}
+      {activeTab === 'browse' && categories.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.categoryScroll}
+          contentContainerStyle={styles.categoryContainer}
+        >
           <TouchableOpacity
-            key={cat}
-            style={[styles.categoryChip, filterCategory === cat && styles.categoryChipActive]}
-            onPress={() => setFilterCategory(cat)}
+            style={[styles.categoryChip, !filterCategory && styles.categoryChipActive]}
+            onPress={() => setFilterCategory(null)}
           >
-            <Text style={[styles.categoryText, filterCategory === cat && styles.categoryTextActive]}>
-              {cat}
+            <Text style={[styles.categoryText, !filterCategory && styles.categoryTextActive]}>
+              All
             </Text>
           </TouchableOpacity>
-        ))}
-      </ScrollView>
+          {categories.map((cat) => (
+            <TouchableOpacity
+              key={cat}
+              style={[styles.categoryChip, filterCategory === cat && styles.categoryChipActive]}
+              onPress={() => setFilterCategory(cat)}
+            >
+              <Text style={[styles.categoryText, filterCategory === cat && styles.categoryTextActive]}>
+                {cat}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
 
-      {/* Offers List */}
+      {/* Content */}
       <ScrollView
         style={styles.content}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6c5ce7" />
         }
       >
-        {filteredOffers.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Ionicons name="cube-outline" size={64} color="#666" />
-            <Text style={styles.emptyTitle}>No Offers Available</Text>
-            <Text style={styles.emptySubtitle}>
-              Check back later for new product offers in this zone
-            </Text>
-          </View>
+        {activeTab === 'active' ? (
+          <>
+            {activeBids.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="flame-outline" size={64} color="#666" />
+                <Text style={styles.emptyTitle}>No Active Bids</Text>
+                <Text style={styles.emptySubtitle}>
+                  Browse products and join group orders to see active bids here
+                </Text>
+                <TouchableOpacity 
+                  style={styles.browseButton}
+                  onPress={() => setActiveTab('browse')}
+                >
+                  <Text style={styles.browseButtonText}>Browse Products</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              activeBids.map(offer => renderOfferCard(offer, true))
+            )}
+          </>
         ) : (
-          filteredOffers.map(renderOfferCard)
+          <>
+            {/* Offers with active group buying */}
+            {browseOffers.length > 0 && (
+              <>
+                <Text style={styles.sectionTitle}>Available Offers</Text>
+                {browseOffers.map(offer => renderOfferCard(offer, true))}
+              </>
+            )}
+
+            {/* Products without offers */}
+            {productsWithoutOffers.length > 0 && (
+              <>
+                <Text style={styles.sectionTitle}>Request a Bid</Text>
+                <Text style={styles.sectionSubtitle}>
+                  These products don't have active offers. Request a bid and we'll try to get you a deal!
+                </Text>
+                {productsWithoutOffers.map(renderProductCard)}
+              </>
+            )}
+
+            {browseOffers.length === 0 && productsWithoutOffers.length === 0 && (
+              <View style={styles.emptyState}>
+                <Ionicons name="search-outline" size={64} color="#666" />
+                <Text style={styles.emptyTitle}>No Results</Text>
+                <Text style={styles.emptySubtitle}>
+                  Try a different search term or category
+                </Text>
+              </View>
+            )}
+          </>
         )}
         <View style={{ height: 20 }} />
       </ScrollView>
@@ -391,6 +626,15 @@ export default function CatalogScreen() {
                     <Ionicons name="close" size={24} color="#fff" />
                   </TouchableOpacity>
                 </View>
+
+                {/* Product Image */}
+                {selectedOffer.product_images && selectedOffer.product_images.length > 0 && (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imageScroll}>
+                    {selectedOffer.product_images.map((img, idx) => (
+                      <Image key={idx} source={{ uri: img }} style={styles.modalImage} />
+                    ))}
+                  </ScrollView>
+                )}
 
                 <View style={styles.offerDetailSection}>
                   <View style={styles.detailRow}>
@@ -485,6 +729,92 @@ export default function CatalogScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Bid Request Modal */}
+      <Modal
+        visible={bidModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setBidModalVisible(false)}
+      >
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <View style={[styles.modalContent, { paddingBottom: insets.bottom + 24 }]}>
+            {selectedProduct && (
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Request a Bid</Text>
+                  <TouchableOpacity onPress={() => setBidModalVisible(false)}>
+                    <Ionicons name="close" size={24} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.bidProductInfo}>
+                  {selectedProduct.images && selectedProduct.images.length > 0 ? (
+                    <Image source={{ uri: selectedProduct.images[0] }} style={styles.bidProductImage} />
+                  ) : (
+                    <View style={styles.bidProductIcon}>
+                      <Ionicons name="cube" size={32} color="#6c5ce7" />
+                    </View>
+                  )}
+                  <View style={styles.bidProductDetails}>
+                    <Text style={styles.bidProductName}>{selectedProduct.name}</Text>
+                    <Text style={styles.bidProductBrand}>{selectedProduct.brand}</Text>
+                    <Text style={styles.bidProductCategory}>{selectedProduct.category_name || selectedProduct.category} • {selectedProduct.unit}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.bidForm}>
+                  <Text style={styles.inputLabel}>How much do you need? ({selectedProduct.unit}) *</Text>
+                  <TextInput
+                    style={styles.bidInput}
+                    value={bidQuantity}
+                    onChangeText={setBidQuantity}
+                    keyboardType="number-pad"
+                    placeholder="Enter quantity"
+                    placeholderTextColor="#666"
+                  />
+
+                  <Text style={styles.inputLabel}>Any notes for the supplier? (Optional)</Text>
+                  <TextInput
+                    style={[styles.bidInput, styles.bidNotesInput]}
+                    value={bidNotes}
+                    onChangeText={setBidNotes}
+                    placeholder="e.g., Need by next week, specific brand preference..."
+                    placeholderTextColor="#666"
+                    multiline
+                    numberOfLines={3}
+                  />
+                </View>
+
+                <View style={styles.bidInfo}>
+                  <Ionicons name="information-circle" size={20} color="#f39c12" />
+                  <Text style={styles.bidInfoText}>
+                    Your request will be reviewed by our team. We'll try to find a supplier and create an offer for your zone.
+                  </Text>
+                </View>
+
+                <TouchableOpacity 
+                  style={[styles.submitBidButton, (!bidQuantity || parseInt(bidQuantity) <= 0 || submitting) && styles.orderButtonDisabled]} 
+                  onPress={handleRequestBid}
+                  disabled={!bidQuantity || parseInt(bidQuantity) <= 0 || submitting}
+                >
+                  {submitting ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <>
+                      <Ionicons name="hand-left" size={20} color="#fff" />
+                      <Text style={styles.orderButtonText}>Submit Request</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </ScrollView>
+            )}
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -507,7 +837,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#1a1a2e',
-    margin: 16,
+    marginHorizontal: 16,
+    marginTop: 16,
     padding: 12,
     borderRadius: 12,
     gap: 8,
@@ -517,8 +848,52 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
   },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1a1a2e',
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 12,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    color: '#fff',
+    fontSize: 16,
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    marginTop: 12,
+    backgroundColor: '#1a1a2e',
+    borderRadius: 12,
+    padding: 4,
+  },
+  tab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 10,
+    gap: 6,
+  },
+  tabActive: {
+    backgroundColor: '#6c5ce7',
+  },
+  tabText: {
+    color: '#666',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  tabTextActive: {
+    color: '#fff',
+  },
   categoryScroll: {
     maxHeight: 44,
+    marginTop: 12,
   },
   categoryContainer: {
     paddingHorizontal: 16,
@@ -547,6 +922,19 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
   },
+  sectionTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  sectionSubtitle: {
+    color: '#a0a0a0',
+    fontSize: 14,
+    marginBottom: 16,
+    marginTop: -8,
+  },
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -563,6 +951,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     marginTop: 8,
+    paddingHorizontal: 32,
+  },
+  browseButton: {
+    backgroundColor: '#6c5ce7',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 20,
+  },
+  browseButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   offerCard: {
     backgroundColor: '#1a1a2e',
@@ -578,6 +979,12 @@ const styles = StyleSheet.create({
   productInfo: {
     flexDirection: 'row',
     flex: 1,
+  },
+  productImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#0f0f1a',
   },
   productIcon: {
     width: 48,
@@ -683,6 +1090,51 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
+  activeBidBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    gap: 4,
+  },
+  activeBidText: {
+    color: '#f39c12',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  productCard: {
+    backgroundColor: '#1a1a2e',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+  },
+  productCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  productCardInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  productUnit: {
+    color: '#666',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  requestBidButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f39c12',
+    padding: 12,
+    borderRadius: 12,
+    marginTop: 12,
+    gap: 8,
+  },
+  requestBidText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
@@ -693,7 +1145,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
-    maxHeight: '85%',
+    maxHeight: '90%',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -707,6 +1159,16 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     flex: 1,
     marginRight: 16,
+  },
+  imageScroll: {
+    marginBottom: 16,
+  },
+  modalImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 12,
+    marginRight: 12,
+    backgroundColor: '#0f0f1a',
   },
   zoneOption: {
     flexDirection: 'row',
@@ -858,5 +1320,93 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  // Bid Request Modal Styles
+  bidProductInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0f0f1a',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+  },
+  bidProductImage: {
+    width: 64,
+    height: 64,
+    borderRadius: 12,
+    backgroundColor: '#1a1a2e',
+  },
+  bidProductIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 12,
+    backgroundColor: 'rgba(108, 92, 231, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bidProductDetails: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  bidProductName: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  bidProductBrand: {
+    color: '#a0a0a0',
+    fontSize: 14,
+    marginTop: 2,
+  },
+  bidProductCategory: {
+    color: '#666',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  bidForm: {
+    marginBottom: 16,
+  },
+  inputLabel: {
+    color: '#fff',
+    fontSize: 14,
+    marginBottom: 8,
+  },
+  bidInput: {
+    backgroundColor: '#0f0f1a',
+    borderRadius: 12,
+    padding: 16,
+    color: '#fff',
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#2d2d44',
+    marginBottom: 16,
+  },
+  bidNotesInput: {
+    height: 100,
+    textAlignVertical: 'top',
+  },
+  bidInfo: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: 'rgba(243, 156, 18, 0.1)',
+    padding: 12,
+    borderRadius: 12,
+    gap: 8,
+    marginBottom: 8,
+  },
+  bidInfoText: {
+    color: '#a0a0a0',
+    fontSize: 12,
+    flex: 1,
+  },
+  submitBidButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f39c12',
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 12,
+    gap: 8,
   },
 });
