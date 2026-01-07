@@ -1314,7 +1314,7 @@ async def create_order_for_retailer(retailer_id: str, offer_id: str, quantity: i
         status="placed"
     )
     
-    await db.orders.insert_one(order.model_dump())
+    await db.order_items.insert_one(order.model_dump())
     
     # Update offer's aggregated quantity
     await db.supplier_offers.update_one(
@@ -1331,16 +1331,16 @@ async def create_order_for_retailer(retailer_id: str, offer_id: str, quantity: i
         )
     
     # Update all orders for this offer with new price
-    await db.orders.update_many(
+    await db.order_items.update_many(
         {"offer_id": offer_id, "status": "placed"},
         {"$set": {"price_per_unit": price_per_unit}}
     )
     
     # Recalculate total amount for all orders
-    all_orders = await db.orders.find({"offer_id": offer_id, "status": "placed"}).to_list(1000)
+    all_orders = await db.order_items.find({"offer_id": offer_id, "status": "placed"}).to_list(1000)
     for o in all_orders:
         new_total = o["quantity"] * price_per_unit
-        await db.orders.update_one(
+        await db.order_items.update_one(
             {"id": o["id"]},
             {"$set": {"total_amount": new_total}}
         )
