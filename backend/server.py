@@ -986,6 +986,125 @@ async def get_order_details(order_id: str, user=Depends(get_current_user)):
         created_at=order["created_at"]
     )
 
+# ===================== BID REQUEST ENDPOINTS =====================
+
+@api_router.post("/bid-requests")
+async def create_bid_request(request_data: BidRequestCreate, user=Depends(get_current_user)):
+    """Retailer: Request a bid for a product that doesn't have an active offer"""
+    phone = user.get("sub")
+    retailer = await db.retailers.find_one({"phone": phone})
+    
+    if not retailer:
+        raise HTTPException(status_code=404, detail="Retailer not found")
+    
+    # Verify product exists
+    product = await db.products.find_one({"id": request_data.product_id, "is_active": True})
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    
+    # Verify zone exists and retailer belongs to it
+    zone = await db.zones.find_one({"id": request_data.zone_id})
+    if not zone:
+        raise HTTPException(status_code=404, detail="Zone not found")
+    
+    if request_data.zone_id not in retailer.get("zone_ids", []):
+        raise HTTPException(status_code=400, detail="You don't belong to this zone")
+    
+    # Check if there's already an active offer for this product in this zone
+    existing_offer = await db.supplier_offers.find_one({
+        "product_id": request_data.product_id,
+        "zone_id": request_data.zone_id,
+        "is_active": True,
+        "status": {"$in": ["open", "ready_to_pack"]}
+    })
+    
+    if existing_offer:
+        raise HTTPException(status_code=400, detail="An active offer already exists for this product in your zone. Please join that offer instead.")
+    
+    # Check if there's already a pending request from this retailer
+    existing_request = await db.bid_requests.find_one({
+        "product_id": request_data.product_id,
+        "zone_id": request_data.zone_id,
+        "retailer_id": retailer["id"],
+        "status": "pending"
+    })
+    
+    if existing_request:
+        raise HTTPException(status_code=400, detail="You already have a pending bid request for this product")
+    
+    # Create bid request
+    bid_request = BidRequest(
+        product_id=request_data.product_id,
+        product_name=product["name"],
+        product_brand=product["brand"],
+        zone_id=request_data.zone_id,
+        zone_name=zone["name"],
+        retailer_id=retailer["id"],
+        retailer_name=retailer["shop_name"],
+        requested_quantity=request_data.requested_quantity,
+        notes=request_data.notes
+    )
+    
+    await db.bid_requests.insert_one(bid_request.model_dump())
+    
+    logger.info(f"Bid request created by {retailer['shop_name']} for {product['name']} in {zone['name']}")
+    
+    return {
+        "success": True,
+        "request_id": bid_request.id,
+        "message": f"Bid request submitted for {product['name']}. Admin will review and create an offer."
+    }
+
+@api_router.get("/bid-requests/me")
+async def get_my_bid_requests(user=Depends(get_current_user)):
+    """Retailer: Get all my bid requests"""
+    phone = user.get("sub")
+    retailer = await db.retailers.find_one({"phone": phone})
+    
+    if not retailer:
+        raise HTTPException(status_code=404, detail="Retailer not found")
+    
+    requests = await db.bid_requests.find({"retailer_id": retailer["id"]}).sort("created_at", -1).to_list(1000)
+    return [{k: v for k, v in r.items() if k != "_id"} for r in requests]
+
+@api_router.get("/admin/bid-requests")
+async def get_all_bid_requests(admin=Depends(get_admin_user), status: Optional[str] = None):
+    """Admin: Get all bid requests"""
+    query = {}
+    if status:
+        query["status"] = status
+    
+    requests = await db.bid_requests.find(query).sort("created_at", -1).to_list(1000)
+    return [{k: v for k, v in r.items() if k != "_id"} for r in requests]
+
+@api_router.put("/admin/bid-requests/{request_id}/approve")
+async def approve_bid_request(request_id: str, admin=Depends(get_admin_user)):
+    """Admin: Approve a bid request (marks as approved, admin should then create an offer)"""
+    request = await db.bid_requests.find_one({"id": request_id})
+    if not request:
+        raise HTTPException(status_code=404, detail="Bid request not found")
+    
+    await db.bid_requests.update_one(
+        {"id": request_id},
+        {"$set": {"status": "approved"}}
+    )
+    
+    return {"success": True, "message": "Bid request approved. Please create an offer for this product."}
+
+@api_router.put("/admin/bid-requests/{request_id}/reject")
+async def reject_bid_request(request_id: str, reason: Optional[str] = None, admin=Depends(get_admin_user)):
+    """Admin: Reject a bid request"""
+    request = await db.bid_requests.find_one({"id": request_id})
+    if not request:
+        raise HTTPException(status_code=404, detail="Bid request not found")
+    
+    await db.bid_requests.update_one(
+        {"id": request_id},
+        {"$set": {"status": "rejected", "notes": reason or request.get("notes")}}
+    )
+    
+    return {"success": True, "message": "Bid request rejected."}
+
 # ===================== ADMIN ENDPOINTS =====================
 
 @api_router.post("/admin/zones", response_model=Zone)
