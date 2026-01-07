@@ -110,8 +110,23 @@ class ApiService {
     unit: string;
     category: string;
     description?: string;
+    images?: string[];  // Up to 3 image URLs or base64
   }) {
     const response = await this.client.post('/admin/products', data);
+    return response.data;
+  }
+
+  // Admin update product
+  async updateProduct(productId: string, data: {
+    name?: string;
+    brand?: string;
+    barcode?: string;
+    unit?: string;
+    category?: string;
+    description?: string;
+    images?: string[];
+  }) {
+    const response = await this.client.put(`/admin/products/${productId}`, data);
     return response.data;
   }
 
@@ -125,6 +140,45 @@ class ApiService {
     lead_time_days: number;
   }) {
     const response = await this.client.post('/admin/offers', data);
+    return response.data;
+  }
+
+  // Category endpoints
+  async getCategories() {
+    const response = await this.client.get('/categories');
+    return response.data;
+  }
+
+  async createCategory(data: { name: string; parent_id?: string; description?: string }) {
+    const response = await this.client.post('/admin/categories', data);
+    return response.data;
+  }
+
+  // Bid Request endpoints
+  async createBidRequest(data: { product_id: string; zone_id: string; requested_quantity: number; notes?: string }) {
+    const response = await this.client.post('/bid-requests', data);
+    return response.data;
+  }
+
+  async getMyBidRequests() {
+    const response = await this.client.get('/bid-requests/me');
+    return response.data;
+  }
+
+  async getAdminBidRequests(status?: string) {
+    const params = status ? `?status=${status}` : '';
+    const response = await this.client.get(`/admin/bid-requests${params}`);
+    return response.data;
+  }
+
+  async approveBidRequest(requestId: string) {
+    const response = await this.client.put(`/admin/bid-requests/${requestId}/approve`);
+    return response.data;
+  }
+
+  async rejectBidRequest(requestId: string, reason?: string) {
+    const params = reason ? `?reason=${encodeURIComponent(reason)}` : '';
+    const response = await this.client.put(`/admin/bid-requests/${requestId}/reject${params}`);
     return response.data;
   }
 
