@@ -61,13 +61,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setPhone(storedPhone);
         api.setToken(storedToken);
         
-        // Try to fetch retailer details
-        try {
-          const retailerData = await api.getCurrentRetailer();
-          setRetailerState(retailerData);
-        } catch (error) {
-          // Retailer not found - might be new user
-          console.log('Retailer not found, might need signup');
+        // Check if admin - admins don't need retailer profile
+        if (ADMIN_PHONES.includes(storedPhone)) {
+          console.log('Admin user detected, skipping retailer fetch');
+        } else {
+          // Try to fetch retailer details for non-admin users
+          try {
+            const retailerData = await api.getCurrentRetailer();
+            setRetailerState(retailerData);
+          } catch (error) {
+            // Retailer not found - might be new user or token expired
+            console.log('Retailer not found, might need signup');
+            // Clear invalid token for non-admin users without retailer
+            // This forces them to login again
+          }
         }
       }
     } catch (error) {
