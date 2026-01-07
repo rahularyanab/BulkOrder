@@ -158,7 +158,7 @@ export default function CatalogScreen() {
           `Price: ₹${result.price_per_unit}/${selectedOffer.product_unit}\n` +
           `Your Total: ₹${result.total_amount}\n\n` +
           `Zone Total: ${result.new_aggregated_qty} ${selectedOffer.product_unit}\n` +
-          (result.offer_status === 'ready_to_pack' ? '🎉 Minimum quantity reached! Ready to pack!' : ''),
+          (result.offer_status === 'ready_to_pack' ? 'Minimum quantity reached! Ready to pack!' : ''),
           [
             {
               text: 'OK',
@@ -175,7 +175,6 @@ export default function CatalogScreen() {
       } finally {
         setSubmitting(false);
       }
-    }
     }
   };
 
