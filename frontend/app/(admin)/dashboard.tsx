@@ -241,13 +241,26 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 24,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 12,
   },
   headerTitle: {
     color: '#fff',
     fontSize: 24,
     fontWeight: 'bold',
+  },
+  logoutButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(231, 76, 60, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   section: {
     marginBottom: 24,
