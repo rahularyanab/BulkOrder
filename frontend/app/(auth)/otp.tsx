@@ -64,7 +64,11 @@ export default function OTPScreen() {
       const response = await api.verifyOTP(phone!, otpString);
       await login(response.access_token, response.is_new_user, response.retailer_id);
       
-      if (response.is_new_user) {
+      // Check if admin phone
+      const ADMIN_PHONES = ['9999999999', '8888888888', '1234567890'];
+      if (ADMIN_PHONES.includes(phone!)) {
+        router.replace('/(admin)/dashboard');
+      } else if (response.is_new_user) {
         router.replace('/(auth)/signup');
       } else {
         router.replace('/(tabs)/home');
