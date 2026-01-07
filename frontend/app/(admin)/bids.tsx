@@ -9,6 +9,9 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,6 +26,7 @@ interface BidRequest {
   product_id: string;
   product_name?: string;
   product_brand?: string;
+  product_unit?: string;
   zone_id: string;
   zone_name?: string;
   requested_quantity: number;
@@ -32,22 +36,50 @@ interface BidRequest {
   created_at: string;
 }
 
+interface Supplier {
+  id: string;
+  name: string;
+  code: string;
+}
+
+interface QuantitySlab {
+  min_qty: number;
+  max_qty: number | null;
+  price_per_unit: number;
+}
+
 export default function AdminBidsScreen() {
   const insets = useSafeAreaInsets();
   const [bidRequests, setBidRequests] = useState<BidRequest[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState<string>('pending');
   const [selectedBid, setSelectedBid] = useState<BidRequest | null>(null);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  
+  // Offer creation state
+  const [createOfferModalVisible, setCreateOfferModalVisible] = useState(false);
+  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
+  const [minFulfillmentQty, setMinFulfillmentQty] = useState('');
+  const [leadTimeDays, setLeadTimeDays] = useState('3');
+  const [slabs, setSlabs] = useState<QuantitySlab[]>([
+    { min_qty: 1, max_qty: 10, price_per_unit: 100 },
+    { min_qty: 11, max_qty: 50, price_per_unit: 90 },
+    { min_qty: 51, max_qty: null, price_per_unit: 80 },
+  ]);
 
-  const fetchBidRequests = async () => {
+  const fetchData = async () => {
     try {
-      const data = await api.getAdminBidRequests(activeFilter !== 'all' ? activeFilter : undefined);
-      setBidRequests(data);
+      const [bidsData, suppliersData] = await Promise.all([
+        api.getAdminBidRequests(activeFilter !== 'all' ? activeFilter : undefined),
+        api.getSuppliers(),
+      ]);
+      setBidRequests(bidsData);
+      setSuppliers(suppliersData);
     } catch (error) {
-      console.error('Failed to fetch bid requests:', error);
+      console.error('Failed to fetch data:', error);
     } finally {
       setLoading(false);
     }
@@ -55,40 +87,81 @@ export default function AdminBidsScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      fetchBidRequests();
+      fetchData();
     }, [activeFilter])
   );
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchBidRequests();
+    await fetchData();
     setRefreshing(false);
   };
 
-  const handleApprove = async (bidId: string) => {
-    Alert.alert(
-      'Approve Bid Request',
-      'This will mark the bid request as approved. You should then create an offer for this product in the zone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Approve',
-          onPress: async () => {
-            setActionLoading(true);
-            try {
-              await api.approveBidRequest(bidId);
-              Alert.alert('Success', 'Bid request approved! Now create an offer for this product.');
+  const handleApproveWithOffer = () => {
+    if (!selectedBid) return;
+    
+    // Pre-fill minimum fulfillment with requested quantity
+    setMinFulfillmentQty(selectedBid.requested_quantity.toString());
+    setCreateOfferModalVisible(true);
+  };
+
+  const handleCreateOfferAndApprove = async () => {
+    if (!selectedBid || !selectedSupplier) {
+      Alert.alert('Error', 'Please select a supplier');
+      return;
+    }
+
+    if (!minFulfillmentQty || parseInt(minFulfillmentQty) <= 0) {
+      Alert.alert('Error', 'Please enter a valid minimum fulfillment quantity');
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      // Create the offer
+      await api.createOffer({
+        product_id: selectedBid.product_id,
+        supplier_id: selectedSupplier.id,
+        zone_id: selectedBid.zone_id,
+        quantity_slabs: slabs,
+        min_fulfillment_qty: parseInt(minFulfillmentQty),
+        lead_time_days: parseInt(leadTimeDays),
+      });
+
+      // Approve the bid request
+      await api.approveBidRequest(selectedBid.id);
+
+      Alert.alert(
+        'Success!',
+        `Offer created and bid request approved!\n\nRetailers in ${selectedBid.zone_name} can now see this offer.`,
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              setCreateOfferModalVisible(false);
               setDetailModalVisible(false);
-              fetchBidRequests();
-            } catch (error: any) {
-              Alert.alert('Error', error.response?.data?.detail || 'Failed to approve bid request');
-            } finally {
-              setActionLoading(false);
-            }
+              resetOfferForm();
+              fetchData();
+            },
           },
-        },
-      ]
-    );
+        ]
+      );
+    } catch (error: any) {
+      Alert.alert('Error', error.response?.data?.detail || 'Failed to create offer');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const resetOfferForm = () => {
+    setSelectedSupplier(null);
+    setMinFulfillmentQty('');
+    setLeadTimeDays('3');
+    setSlabs([
+      { min_qty: 1, max_qty: 10, price_per_unit: 100 },
+      { min_qty: 11, max_qty: 50, price_per_unit: 90 },
+      { min_qty: 51, max_qty: null, price_per_unit: 80 },
+    ]);
   };
 
   const handleReject = async (bidId: string) => {
@@ -106,7 +179,7 @@ export default function AdminBidsScreen() {
               await api.rejectBidRequest(bidId, reason);
               Alert.alert('Success', 'Bid request rejected.');
               setDetailModalVisible(false);
-              fetchBidRequests();
+              fetchData();
             } catch (error: any) {
               Alert.alert('Error', error.response?.data?.detail || 'Failed to reject bid request');
             } finally {
@@ -117,6 +190,31 @@ export default function AdminBidsScreen() {
       ],
       'plain-text'
     );
+  };
+
+  const updateSlab = (index: number, field: string, value: string) => {
+    const newSlabs = [...slabs];
+    if (field === 'min_qty' || field === 'price_per_unit') {
+      (newSlabs[index] as any)[field] = parseInt(value) || 0;
+    } else if (field === 'max_qty') {
+      (newSlabs[index] as any)[field] = value === '' ? null : parseInt(value);
+    }
+    setSlabs(newSlabs);
+  };
+
+  const addSlab = () => {
+    const lastSlab = slabs[slabs.length - 1];
+    setSlabs([...slabs, {
+      min_qty: (lastSlab.max_qty || lastSlab.min_qty) + 1,
+      max_qty: null,
+      price_per_unit: Math.max(lastSlab.price_per_unit - 10, 10),
+    }]);
+  };
+
+  const removeSlab = (index: number) => {
+    if (slabs.length > 1) {
+      setSlabs(slabs.filter((_, i) => i !== index));
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -134,6 +232,15 @@ export default function AdminBidsScreen() {
       case 'approved': return 'checkmark-circle';
       case 'rejected': return 'close-circle';
       default: return 'help-circle';
+    }
+  };
+
+  const getSupplierColor = (code: string) => {
+    switch (code) {
+      case 'HUL': return '#0066cc';
+      case 'ITC': return '#cc6600';
+      case 'FORTUNE': return '#006633';
+      default: return '#6c5ce7';
     }
   };
 
@@ -286,7 +393,7 @@ export default function AdminBidsScreen() {
                     </View>
                     <View style={[styles.detailRow, { borderBottomWidth: 0 }]}>
                       <Text style={styles.detailLabel}>Requested Qty</Text>
-                      <Text style={styles.detailValueHighlight}>{selectedBid.requested_quantity}</Text>
+                      <Text style={styles.detailValueHighlight}>{selectedBid.requested_quantity} {selectedBid.product_unit || 'units'}</Text>
                     </View>
                   </View>
                 </View>
@@ -332,17 +439,11 @@ export default function AdminBidsScreen() {
                   <View style={styles.actionButtons}>
                     <TouchableOpacity
                       style={[styles.actionButton, styles.approveButton]}
-                      onPress={() => handleApprove(selectedBid.id)}
+                      onPress={handleApproveWithOffer}
                       disabled={actionLoading}
                     >
-                      {actionLoading ? (
-                        <ActivityIndicator color="#fff" />
-                      ) : (
-                        <>
-                          <Ionicons name="checkmark-circle" size={20} color="#fff" />
-                          <Text style={styles.actionButtonText}>Approve</Text>
-                        </>
-                      )}
+                      <Ionicons name="pricetag" size={20} color="#fff" />
+                      <Text style={styles.actionButtonText}>Create Offer & Approve</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.actionButton, styles.rejectButton]}
@@ -358,6 +459,174 @@ export default function AdminBidsScreen() {
             )}
           </View>
         </View>
+      </Modal>
+
+      {/* Create Offer Modal */}
+      <Modal
+        visible={createOfferModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => {
+          setCreateOfferModalVisible(false);
+          resetOfferForm();
+        }}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <View style={[styles.modalContent, { paddingBottom: insets.bottom + 24, maxHeight: '95%' }]}>
+            {selectedBid && (
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Create Offer</Text>
+                  <TouchableOpacity onPress={() => {
+                    setCreateOfferModalVisible(false);
+                    resetOfferForm();
+                  }}>
+                    <Ionicons name="close" size={24} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Product Info */}
+                <View style={styles.offerProductInfo}>
+                  <Ionicons name="cube" size={24} color="#6c5ce7" />
+                  <View style={styles.offerProductDetails}>
+                    <Text style={styles.offerProductName}>{selectedBid.product_name}</Text>
+                    <Text style={styles.offerProductMeta}>
+                      {selectedBid.product_brand} • {selectedBid.zone_name}
+                    </Text>
+                    <Text style={styles.requestedQty}>
+                      Requested: {selectedBid.requested_quantity} {selectedBid.product_unit || 'units'}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Supplier Selection */}
+                <Text style={styles.inputLabel}>Select Supplier *</Text>
+                <View style={styles.supplierSelection}>
+                  {suppliers.map((supplier) => (
+                    <TouchableOpacity
+                      key={supplier.id}
+                      style={[
+                        styles.supplierChip,
+                        { borderColor: getSupplierColor(supplier.code) },
+                        selectedSupplier?.id === supplier.id && { backgroundColor: getSupplierColor(supplier.code) },
+                      ]}
+                      onPress={() => setSelectedSupplier(supplier)}
+                    >
+                      <Text style={[
+                        styles.supplierChipText,
+                        { color: selectedSupplier?.id === supplier.id ? '#fff' : getSupplierColor(supplier.code) },
+                      ]}>
+                        {supplier.code}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Min Fulfillment & Lead Time */}
+                <View style={styles.rowInputs}>
+                  <View style={styles.halfInput}>
+                    <Text style={styles.inputLabel}>Min Fulfillment Qty *</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={minFulfillmentQty}
+                      onChangeText={setMinFulfillmentQty}
+                      keyboardType="number-pad"
+                      placeholder="50"
+                      placeholderTextColor="#666"
+                    />
+                  </View>
+                  <View style={styles.halfInput}>
+                    <Text style={styles.inputLabel}>Lead Time (days)</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={leadTimeDays}
+                      onChangeText={setLeadTimeDays}
+                      keyboardType="number-pad"
+                      placeholder="3"
+                      placeholderTextColor="#666"
+                    />
+                  </View>
+                </View>
+
+                {/* Price Slabs */}
+                <View style={styles.slabHeader}>
+                  <Text style={styles.inputLabel}>Price Slabs *</Text>
+                  <TouchableOpacity onPress={addSlab}>
+                    <Ionicons name="add-circle" size={24} color="#27ae60" />
+                  </TouchableOpacity>
+                </View>
+                
+                {slabs.map((slab, index) => (
+                  <View key={index} style={styles.slabRow}>
+                    <View style={styles.slabInputGroup}>
+                      <Text style={styles.slabLabel}>Min</Text>
+                      <TextInput
+                        style={styles.slabInput}
+                        value={slab.min_qty.toString()}
+                        onChangeText={(v) => updateSlab(index, 'min_qty', v)}
+                        keyboardType="number-pad"
+                      />
+                    </View>
+                    <View style={styles.slabInputGroup}>
+                      <Text style={styles.slabLabel}>Max</Text>
+                      <TextInput
+                        style={styles.slabInput}
+                        value={slab.max_qty?.toString() || ''}
+                        onChangeText={(v) => updateSlab(index, 'max_qty', v)}
+                        keyboardType="number-pad"
+                        placeholder="∞"
+                        placeholderTextColor="#666"
+                      />
+                    </View>
+                    <View style={styles.slabInputGroup}>
+                      <Text style={styles.slabLabel}>₹/unit</Text>
+                      <TextInput
+                        style={[styles.slabInput, styles.priceInput]}
+                        value={slab.price_per_unit.toString()}
+                        onChangeText={(v) => updateSlab(index, 'price_per_unit', v)}
+                        keyboardType="number-pad"
+                      />
+                    </View>
+                    {slabs.length > 1 && (
+                      <TouchableOpacity onPress={() => removeSlab(index)}>
+                        <Ionicons name="close-circle" size={24} color="#e74c3c" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ))}
+
+                <View style={styles.slabInfo}>
+                  <Ionicons name="information-circle" size={16} color="#6c5ce7" />
+                  <Text style={styles.slabInfoText}>
+                    Lower prices for higher quantities encourage group ordering
+                  </Text>
+                </View>
+
+                {/* Create Button */}
+                <TouchableOpacity
+                  style={[
+                    styles.createOfferButton,
+                    (!selectedSupplier || !minFulfillmentQty || actionLoading) && styles.createOfferButtonDisabled,
+                  ]}
+                  onPress={handleCreateOfferAndApprove}
+                  disabled={!selectedSupplier || !minFulfillmentQty || actionLoading}
+                >
+                  {actionLoading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <>
+                      <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                      <Text style={styles.createOfferButtonText}>Create Offer & Approve Bid</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </ScrollView>
+            )}
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -589,12 +858,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   actionButtons: {
-    flexDirection: 'row',
     gap: 12,
     marginTop: 8,
   },
   actionButton: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -609,6 +876,139 @@ const styles = StyleSheet.create({
     backgroundColor: '#e74c3c',
   },
   actionButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  // Offer creation styles
+  offerProductInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0f0f1a',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+    gap: 12,
+  },
+  offerProductDetails: {
+    flex: 1,
+  },
+  offerProductName: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  offerProductMeta: {
+    color: '#a0a0a0',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  requestedQty: {
+    color: '#f39c12',
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  inputLabel: {
+    color: '#fff',
+    fontSize: 14,
+    marginBottom: 8,
+    marginTop: 12,
+  },
+  supplierSelection: {
+    flexDirection: 'row',
+    gap: 12,
+    flexWrap: 'wrap',
+  },
+  supplierChip: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 2,
+  },
+  supplierChipText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  rowInputs: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  halfInput: {
+    flex: 1,
+  },
+  input: {
+    backgroundColor: '#0f0f1a',
+    borderRadius: 12,
+    padding: 14,
+    color: '#fff',
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#2d2d44',
+  },
+  slabHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  slabRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  slabInputGroup: {
+    flex: 1,
+  },
+  slabLabel: {
+    color: '#666',
+    fontSize: 10,
+    marginBottom: 4,
+  },
+  slabInput: {
+    backgroundColor: '#0f0f1a',
+    borderRadius: 8,
+    padding: 10,
+    color: '#fff',
+    fontSize: 14,
+    textAlign: 'center',
+    borderWidth: 1,
+    borderColor: '#2d2d44',
+  },
+  priceInput: {
+    color: '#27ae60',
+    fontWeight: 'bold',
+  },
+  slabInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(108, 92, 231, 0.1)',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 8,
+    gap: 8,
+  },
+  slabInfoText: {
+    color: '#a0a0a0',
+    fontSize: 12,
+    flex: 1,
+  },
+  createOfferButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#27ae60',
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 20,
+    gap: 8,
+  },
+  createOfferButtonDisabled: {
+    backgroundColor: '#4a4a5e',
+  },
+  createOfferButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
