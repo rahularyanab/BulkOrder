@@ -38,9 +38,28 @@ interface DashboardStats {
 
 export default function AdminDashboard() {
   const router = useRouter();
+  const { logout } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Logout', 
+          style: 'destructive',
+          onPress: async () => {
+            await logout();
+            router.replace('/(auth)/phone');
+          }
+        },
+      ]
+    );
+  };
 
   const fetchStats = async () => {
     try {
