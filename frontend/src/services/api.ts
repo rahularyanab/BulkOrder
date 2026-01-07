@@ -129,6 +129,74 @@ class ApiService {
     return response.data;
   }
 
+  // Payment endpoints (retailer)
+  async getMyPayments() {
+    const response = await this.client.get('/payments/me');
+    return response.data;
+  }
+
+  async raiseDispute(paymentId: string, reason: string) {
+    const response = await this.client.post('/payments/dispute', { payment_id: paymentId, reason });
+    return response.data;
+  }
+
+  // Admin endpoints
+  async getAdminDashboardStats() {
+    const response = await this.client.get('/admin/dashboard/stats');
+    return response.data;
+  }
+
+  async getReadyToPackOffers() {
+    const response = await this.client.get('/admin/fulfillment/ready');
+    return response.data;
+  }
+
+  async getAllFulfillmentOffers(status?: string) {
+    const params = status ? `?status=${status}` : '';
+    const response = await this.client.get(`/admin/fulfillment/all${params}`);
+    return response.data;
+  }
+
+  async updateOfferStatus(offerId: string, newStatus: string) {
+    const response = await this.client.put(`/admin/fulfillment/offer/${offerId}/status?new_status=${newStatus}`);
+    return response.data;
+  }
+
+  async getAdminOrders(status?: string, zoneId?: string) {
+    const params = new URLSearchParams();
+    if (status) params.append('status', status);
+    if (zoneId) params.append('zone_id', zoneId);
+    const response = await this.client.get(`/admin/orders?${params.toString()}`);
+    return response.data;
+  }
+
+  async recordPayment(orderId: string, amount: number, paymentMethod: string, referenceNumber?: string, notes?: string) {
+    const response = await this.client.post('/admin/payments', {
+      order_id: orderId,
+      amount,
+      payment_method: paymentMethod,
+      reference_number: referenceNumber,
+      notes
+    });
+    return response.data;
+  }
+
+  async getAdminPayments(status?: string) {
+    const params = status ? `?status=${status}` : '';
+    const response = await this.client.get(`/admin/payments${params}`);
+    return response.data;
+  }
+
+  async releasePayment(paymentId: string) {
+    const response = await this.client.put(`/admin/payments/${paymentId}/release`);
+    return response.data;
+  }
+
+  async resolveDispute(paymentId: string, resolution: string, refund: boolean) {
+    const response = await this.client.put(`/admin/payments/${paymentId}/resolve-dispute?resolution=${encodeURIComponent(resolution)}&refund=${refund}`);
+    return response.data;
+  }
+
   // Health check
   async healthCheck() {
     const response = await this.client.get('/health');
