@@ -703,13 +703,19 @@ async def get_product(product_id: str):
 # ===================== SUPPLIER OFFER ENDPOINTS =====================
 
 @api_router.get("/offers/zone/{zone_id}")
-async def get_zone_offers(zone_id: str, user=Depends(get_current_user)):
+async def get_zone_offers(zone_id: str, user=Depends(get_current_user), active_only: bool = False, search: Optional[str] = None):
     """Get all active offers for a specific zone with full details"""
-    offers = await db.supplier_offers.find({
+    query = {
         "zone_id": zone_id,
         "is_active": True,
         "status": {"$in": ["open", "ready_to_pack"]}
-    }).to_list(1000)
+    }
+    
+    # If active_only, only return offers that have orders (active bids)
+    if active_only:
+        query["current_aggregated_qty"] = {"$gt": 0}
+    
+    offers = await db.supplier_offers.find(query).to_list(1000)
     
     result = []
     for offer in offers:
@@ -719,7 +725,17 @@ async def get_zone_offers(zone_id: str, user=Depends(get_current_user)):
         zone = await db.zones.find_one({"id": offer["zone_id"]})
         
         if product and supplier and zone:
+            # Apply search filter
+            if search:
+                search_lower = search.lower()
+                if search_lower not in product["name"].lower() and search_lower not in product["brand"].lower():
+                    continue
+            
             progress = (offer["current_aggregated_qty"] / offer["min_fulfillment_qty"]) * 100 if offer["min_fulfillment_qty"] > 0 else 0
+            
+            # Get category name
+            category = await db.categories.find_one({"id": product.get("category_id")})
+            category_name = category["name"] if category else product.get("category", "Uncategorized")
             
             result.append(SupplierOfferWithDetails(
                 id=offer["id"],
@@ -727,8 +743,9 @@ async def get_zone_offers(zone_id: str, user=Depends(get_current_user)):
                 product_name=product["name"],
                 product_brand=product["brand"],
                 product_unit=product["unit"],
-                product_category=product["category"],
-                product_image=product.get("image_base64"),
+                product_category_id=product.get("category_id", ""),
+                product_category_name=category_name,
+                product_images=product.get("images", []),
                 supplier_id=offer["supplier_id"],
                 supplier_name=supplier["name"],
                 supplier_code=supplier["code"],
