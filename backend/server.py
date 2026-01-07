@@ -625,6 +625,192 @@ async def get_offer_details(offer_id: str, user=Depends(get_current_user)):
         progress_percentage=min(progress, 100)
     )
 
+# ===================== ORDER ENDPOINTS =====================
+
+@api_router.post("/orders")
+async def create_order(order_data: OrderItemCreate, user=Depends(get_current_user)):
+    """Create a new order item for an offer"""
+    phone = user.get("sub")
+    retailer = await db.retailers.find_one({"phone": phone})
+    
+    if not retailer:
+        raise HTTPException(status_code=404, detail="Retailer not found")
+    
+    # Get the offer
+    offer = await db.supplier_offers.find_one({"id": order_data.offer_id, "is_active": True})
+    if not offer:
+        raise HTTPException(status_code=404, detail="Offer not found")
+    
+    # Check if offer is still open
+    if offer["status"] not in ["open", "ready_to_pack"]:
+        raise HTTPException(status_code=400, detail="This offer is no longer accepting orders")
+    
+    # Get product and supplier details
+    product = await db.products.find_one({"id": offer["product_id"]})
+    supplier = await db.suppliers.find_one({"id": offer["supplier_id"]})
+    
+    if not product or not supplier:
+        raise HTTPException(status_code=404, detail="Product or supplier not found")
+    
+    # Calculate new aggregated quantity
+    new_aggregated_qty = offer["current_aggregated_qty"] + order_data.quantity
+    
+    # Get price based on NEW aggregated quantity (group benefit!)
+    price_per_unit = get_price_for_quantity(offer["quantity_slabs"], new_aggregated_qty)
+    total_amount = price_per_unit * order_data.quantity
+    
+    # Create order item
+    order_item = OrderItem(
+        offer_id=order_data.offer_id,
+        retailer_id=retailer["id"],
+        retailer_name=retailer["shop_name"],
+        zone_id=offer["zone_id"],
+        product_id=offer["product_id"],
+        product_name=product["name"],
+        product_brand=product["brand"],
+        product_unit=product["unit"],
+        supplier_id=offer["supplier_id"],
+        supplier_name=supplier["name"],
+        supplier_code=supplier["code"],
+        quantity=order_data.quantity,
+        price_per_unit=price_per_unit,
+        total_amount=total_amount
+    )
+    
+    # Save order item
+    await db.order_items.insert_one(order_item.model_dump())
+    
+    # Update offer's aggregated quantity
+    update_data = {
+        "current_aggregated_qty": new_aggregated_qty,
+        "updated_at": datetime.utcnow()
+    }
+    
+    # Check if min fulfillment qty is met
+    if new_aggregated_qty >= offer["min_fulfillment_qty"] and offer["status"] == "open":
+        update_data["status"] = "ready_to_pack"
+        logger.info(f"Offer {offer['id']} is now ready to pack! Aggregated: {new_aggregated_qty}")
+    
+    await db.supplier_offers.update_one({"id": order_data.offer_id}, {"$set": update_data})
+    
+    # Update all existing orders for this offer with new price (group benefit!)
+    await db.order_items.update_many(
+        {"offer_id": order_data.offer_id},
+        {"$set": {"price_per_unit": price_per_unit, "updated_at": datetime.utcnow()}}
+    )
+    
+    # Recalculate total_amount for all orders
+    all_orders = await db.order_items.find({"offer_id": order_data.offer_id}).to_list(1000)
+    for o in all_orders:
+        new_total = o["quantity"] * price_per_unit
+        await db.order_items.update_one({"id": o["id"]}, {"$set": {"total_amount": new_total}})
+    
+    logger.info(f"Order created by {retailer['shop_name']}: {order_data.quantity} {product['unit']} of {product['name']} at ₹{price_per_unit}/{product['unit']}")
+    
+    return {
+        "success": True,
+        "order_id": order_item.id,
+        "quantity": order_data.quantity,
+        "price_per_unit": price_per_unit,
+        "total_amount": total_amount,
+        "new_aggregated_qty": new_aggregated_qty,
+        "offer_status": update_data.get("status", offer["status"]),
+        "message": f"Order placed successfully! New zone total: {new_aggregated_qty} {product['unit']}"
+    }
+
+@api_router.get("/orders/me")
+async def get_my_orders(user=Depends(get_current_user)):
+    """Get all orders for current retailer"""
+    phone = user.get("sub")
+    retailer = await db.retailers.find_one({"phone": phone})
+    
+    if not retailer:
+        raise HTTPException(status_code=404, detail="Retailer not found")
+    
+    orders = await db.order_items.find({"retailer_id": retailer["id"]}).sort("created_at", -1).to_list(1000)
+    
+    result = []
+    for order in orders:
+        # Get offer details
+        offer = await db.supplier_offers.find_one({"id": order["offer_id"]})
+        zone = await db.zones.find_one({"id": order["zone_id"]})
+        
+        if offer and zone:
+            progress = (offer["current_aggregated_qty"] / offer["min_fulfillment_qty"]) * 100 if offer["min_fulfillment_qty"] > 0 else 0
+            
+            result.append(OrderItemWithOffer(
+                id=order["id"],
+                offer_id=order["offer_id"],
+                retailer_id=order["retailer_id"],
+                retailer_name=order["retailer_name"],
+                zone_id=order["zone_id"],
+                zone_name=zone["name"],
+                product_id=order["product_id"],
+                product_name=order["product_name"],
+                product_brand=order["product_brand"],
+                product_unit=order["product_unit"],
+                supplier_id=order["supplier_id"],
+                supplier_name=order["supplier_name"],
+                supplier_code=order["supplier_code"],
+                quantity=order["quantity"],
+                price_per_unit=order["price_per_unit"],
+                total_amount=order["total_amount"],
+                status=order["status"],
+                offer_status=offer["status"],
+                offer_aggregated_qty=offer["current_aggregated_qty"],
+                offer_min_fulfillment_qty=offer["min_fulfillment_qty"],
+                offer_progress_percentage=min(progress, 100),
+                created_at=order["created_at"]
+            ))
+    
+    return result
+
+@api_router.get("/orders/{order_id}")
+async def get_order_details(order_id: str, user=Depends(get_current_user)):
+    """Get specific order details"""
+    phone = user.get("sub")
+    retailer = await db.retailers.find_one({"phone": phone})
+    
+    if not retailer:
+        raise HTTPException(status_code=404, detail="Retailer not found")
+    
+    order = await db.order_items.find_one({"id": order_id, "retailer_id": retailer["id"]})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    
+    offer = await db.supplier_offers.find_one({"id": order["offer_id"]})
+    zone = await db.zones.find_one({"id": order["zone_id"]})
+    
+    if not offer or not zone:
+        raise HTTPException(status_code=404, detail="Related data not found")
+    
+    progress = (offer["current_aggregated_qty"] / offer["min_fulfillment_qty"]) * 100 if offer["min_fulfillment_qty"] > 0 else 0
+    
+    return OrderItemWithOffer(
+        id=order["id"],
+        offer_id=order["offer_id"],
+        retailer_id=order["retailer_id"],
+        retailer_name=order["retailer_name"],
+        zone_id=order["zone_id"],
+        zone_name=zone["name"],
+        product_id=order["product_id"],
+        product_name=order["product_name"],
+        product_brand=order["product_brand"],
+        product_unit=order["product_unit"],
+        supplier_id=order["supplier_id"],
+        supplier_name=order["supplier_name"],
+        supplier_code=order["supplier_code"],
+        quantity=order["quantity"],
+        price_per_unit=order["price_per_unit"],
+        total_amount=order["total_amount"],
+        status=order["status"],
+        offer_status=offer["status"],
+        offer_aggregated_qty=offer["current_aggregated_qty"],
+        offer_min_fulfillment_qty=offer["min_fulfillment_qty"],
+        offer_progress_percentage=min(progress, 100),
+        created_at=order["created_at"]
+    )
+
 # ===================== ADMIN ENDPOINTS =====================
 
 @api_router.post("/admin/zones", response_model=Zone)
