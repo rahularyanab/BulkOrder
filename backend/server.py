@@ -351,6 +351,14 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
+async def get_admin_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Verify user is admin"""
+    payload = await get_current_user(credentials)
+    phone = payload.get("sub")
+    if phone not in ADMIN_PHONES:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return payload
+
 # ===================== AUTH ENDPOINTS =====================
 
 @api_router.post("/auth/send-otp")
