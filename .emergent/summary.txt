@@ -1,122 +1,115 @@
 <analysis>
 
 **original_problem_statement:**
-The user wants to build a B2B mobile app for retailers to place group orders from suppliers.
+The user wants to build a B2B mobile app for retailers to place group orders from suppliers. The core functionality involves retailer onboarding, a product catalog, supplier-specific offers, and a group buying mechanism where aggregated order quantities determine the final price for all participants in a zone.
 
-**PRODUCT REQUIREMENTS:**
-- **Users:** Retailers (mobile app) and Admin/Ops (web dashboard, though currently being built into the mobile app).
-- **Suppliers:** Predefined (HUL, ITC, Fortune). No supplier-facing app.
-- **Retailer Onboarding:**
-    - Signup with shop details and address.
-    - GPS location capture.
-    - Automatic zone assignment (5km radius). New zone created if none exist.
-- **Product Catalog:**
-    - Central catalog with name, brand, barcode, unit, image.
-- **Supplier Offers:**
-    - Admin links products to suppliers.
-    - Defines quantity slabs, pricing, minimum fulfillment quantity, lead time.
-    - Offers are zone-specific.
-- **Retailer Ordering (Group Buying):**
-    - Retailers see zone-wise items and offers.
-    - Retailers select an offer and add quantity.
-    - Quantities for an offer are aggregated across all retailers in a zone.
-    - The price for all retailers is determined by the total aggregated quantity.
-    - Once the minimum fulfillment quantity is met, the offer locks and becomes Ready to Pack.
-- **Fulfillment (Admin-driven):**
-    - Admin marks orders as picked-up, out-for-delivery, delivered.
-- **Payments (Admin-driven):**
-    - Admin records payment on delivery.
-    - Payment is locked for 48 hours, during which a retailer can raise a dispute.
-- **Recent Feature Requests:**
-    1.  **Item Images:** Admin can add up to 3 images per product via URL or gallery upload.
-    2.  **Category Management:** Admin can create and manage product categories.
-    3.  **Catalog Redesign for Retailers:**
-        - An Active Bids tab showing only products with ongoing group orders.
-        - A Browse Products tab to see all products and start a new bid.
-        - Search functionality in both views.
-    4.  **Bid Requests:** Retailers can request a bid for a product that doesn't currently have an active offer.
+Recently, the user requested several major features and fixes:
+1.  **Admin Web Login:** Create a web-accessible admin login page with a username/password ( / ) in addition to the existing OTP login.
+2.  **Improved Bidding UI:** For bidding items, the retailer view should clearly display the price for the current aggregated quantity and the price for the next quantity slab to incentivize more orders.
+3.  **Logout Button:** Add a logout button for the admin.
+4.  **Catalog Redesign:** Redesign the retailer catalog with Active Bids and Browse Products tabs.
+5.  **Fix Bid Approval Flow:** A series of bugs were reported and fixed related to approving a bid request from a retailer. The flow should be:
+    *   Retailer requests a bid on a product.
+    *   Admin sees the request, sets up pricing slabs, and approves it, creating a new .
+    *   The initial retailer's requested quantity should automatically become the first order for that new offer.
+    *   The new offer should immediately appear in the Active Bids tab for all retailers in that zone.
+6.  **Fix Fulfillment View:** Admins were not seeing all orders for an offer on the fulfillment screen.
 
 **User's preferred language**: English
 
 **what currently exists?**
-The project is a full-stack application using Expo (React Native) for the frontend and FastAPI with MongoDB for the backend.
-The implementation has been done in phases:
-- **Phase 1 (Done):** Phone/OTP authentication for retailers and admins, retailer profile creation (shop name, address), and automatic zone creation/assignment based on GPS.
-- **Phase 2 (Done):** Product catalog and supplier offer creation. The backend has endpoints to seed data and manage offers. The frontend has a catalog screen to display these offers.
-- **Phase 3 (Done):** Core group ordering functionality. Retailers can place orders, which are saved to the database. The system aggregates quantities per offer, dynamically adjusts the price for all participants as more orders come in, and shows retailers their order history.
-- **Phase 4 (In Progress):** An admin dashboard within the mobile app has been created. It includes backend endpoints and UI shells for viewing stats, managing fulfillment, and handling payments. Catalog management was recently added to the admin dashboard.
-- **Recent Bug Fixes:**
-    - Fixed a layout issue where the bottom tab bar was interfering with system navigation buttons.
-    - Fixed a routing issue where the app would incorrectly navigate to the Complete Signup screen upon launch for existing admin users.
+A full-stack Expo (React Native) and FastAPI/MongoDB application. The core features for retailer onboarding, catalog, group ordering, and a basic admin dashboard are in place.
+
+In this session, the following were added/fixed:
+- **Backend Models:** Updated to be backward-compatible, supporting both  (string) and  to resolve data mismatches. The  model now includes .
+- **Admin Catalog Management:** The admin catalog screen () was heavily updated to support:
+    - Adding products with up to 3 image URLs (using ).
+    - A new tab for creating, viewing, and deleting product categories and sub-categories.
+    - An improved Create Offer form with product search functionality.
+- **Retailer Catalog Redesign:** The retailer catalog () was redesigned with Active Bids and Browse All tabs, including search functionality.
+- **Bid Request Management:** A new Bids screen () was added for admins to view pending bid requests. The approval flow was built out to allow admins to create an offer directly from a bid request.
+- **Logout:** A logout button was added to the admin dashboard.
+- **Bug Fixes:** A series of critical bugs were fixed in the bid approval and order creation flow. It was discovered that orders were being written to the wrong database collection ( instead of ), which was corrected.
 
 **Last working item**:
--   **Last item agent was working:** The agent was in the middle of a major feature implementation based on the user's latest request. It started by updating the backend  to support these new features. Specifically, it:
-    1.  Modified the  model to include a list of  and a .
-    2.  Added new  and  Pydantic models.
-    3.  Added a new  model.
-    4.  Updated the  model.
-    5.  Began adding and updating API endpoints for Category Management (), Bid Requests, and modifying existing Product/Offer endpoints to support the new data structures. The last action was to add endpoints for Bid Requests just before the ADMIN ENDPOINTS section in  and then stating the intention to update the admin product creation endpoint.
+-   **Last item agent was working:** The agent began implementing Phase 1 of the user's latest request: **Admin Login with Password**. It started creating the necessary UI and backend logic.
+    -   Modified  to add a link to a new admin login screen.
+    -   Created a new file  for the password-based login form.
+    -   Added a new backend endpoint  in  to handle password verification.
+    -   Added the corresponding  method in the frontend API service .
 -   **Status:** IN PROGRESS
--   **Agent Testing Done:** N (The backend was just modified and has not been tested).
--   **Which testing method agent to use?** backend testing agent
+-   **Agent Testing Done:** N
+-   **Which testing method agent to use?** both
 -   **User Testing Done:** N
 
 **All Pending/In progress Issue list**:
--   **Issue 1:** Syntax error in . (Priority: P1)
-    -   **Description:** Previously, the agent introduced a syntax error in  that broke the frontend. Although a fix was attempted, it's a large, complex file that has been modified multiple times and might still contain errors. The file needs a thorough review and linting to ensure it's stable.
-    -   **Attempted fixes:** The agent identified and removed an extra closing brace and a  statement outside a function.
+-   **Issue 1:** The complete bid-to-fulfillment flow is fragile and needs end-to-end testing. (Priority: P0)
+    -   **Description:** The user reported multiple issues with this flow (Not working as expected, Still facing the same problem). The agent applied several backend fixes (Pydantic validation, model name correction, correct DB collection usage). However, the user has not confirmed that the entire flow works correctly after the last fix. It's the most complex and bug-prone part of the app.
+    -   **Attempted fixes:**
+        1.  Corrected a  in  ( vs ).
+        2.  Fixed a Pydantic validation error by ensuring all required fields for  are fetched and passed.
+        3.  Fixed a critical bug where bid-generated orders were inserted into  instead of , making them invisible to the admin fulfillment screen.
     -   **Next debug checklist:**
-        1.  Run  on  to catch any syntax or logical errors.
-        2.  Carefully review the component's return statement and ensure all JSX is correctly structured.
-        3.  Restart the expo server and check logs for any compilation errors.
-    -   **Why fix this issue and what will be achieved with the fix?** The catalog screen is a core part of the retailer experience. Fixing this will make the app usable for retailers again.
-    -   **Status:** TESTING PENDING
+        1.  Perform a full end-to-end manual test:
+            -   Retailer A requests a bid for a product with quantity X.
+            -   Admin logs in, goes to the Bids screen, sees the request.
+            -   Admin approves the bid, creating an offer with pricing slabs.
+            -   Verify the bid is removed from the pending list.
+            -   Retailer A (and others) logs in and sees the new offer under Active Bids with an aggregated quantity of X.
+            -   Retailer B adds quantity Y to the same offer.
+            -   Verify the aggregated quantity is now X+Y and the price updates for both retailers.
+            -   Admin logs in, goes to fulfillment, and sees both orders from Retailer A and B for that offer.
+    -   **Why fix this issue and what will be achieved with the fix?** This is the core workflow for introducing new products to the platform. Its stability is critical for user trust.
+    -   **Status:** USER VERIFICATION PENDING
+    -   **Is recurring issue?** Y
+    -   **Should Test frontend/backend/both after fix?** both
+    -   **Blocked on other issue:** None
+
+-   **Issue 2:** Expo Go fails to load the app with Something went wrong or Failed to download remote update. (Priority: P1)
+    -   **Description:** The user was unable to load the app via the standard QR code. This was debugged and found to be an issue with the Expo Go app failing to download the bundle from the provided tunnel URL.
+    -   **Attempted fixes:** A workaround was found: manually entering the ngrok tunnel URL (e.g., ) into the Expo Go app allows the app to load.
+    -   **Next debug checklist:** This may be an environment-specific issue with ngrok or Expo tunnels. The workaround is effective, but the root cause is unknown. The next agent should first provide the user with the manual URL if the problem persists.
+    -   **Why fix this issue and what will be achieved with the fix?** Improves the developer/testing experience.
+    -   **Status:** BLOCKED (Workaround exists)
     -   **Is recurring issue?** Y
     -   **Should Test frontend/backend/both after fix?** Frontend
     -   **Blocked on other issue:** None
 
 **In progress Task List**:
--   **Task 1:** Implement Image Upload, Category Management, and Bid Request feature set (Priority: P0)
-    -   **Description:** This is a large, multi-part task that the previous agent had just started.
-    -   **Where to resume:** The backend models and some API endpoints in  have been created/updated. The next steps are:
-        1.  **Backend:**
-            -   Finish updating the  and  endpoints to handle image URLs and category assignments.
-            -   Implement logic for handling image uploads (if not just URLs). The user mentioned gallery uploads, which implies  or multipart form data handling is needed.
-            -   Thoroughly test all new and modified backend endpoints (, , , ) using .
-        2.  **Frontend (Admin):**
-            -   Update the Admin Catalog Management screen () to allow creating/editing products with up to 3 image URLs and assigning categories.
-            -   Create a new Admin screen for Category Management (create/edit categories).
-            -   Create a new Admin screen to view and action Bid Requests from retailers.
-        3.  **Frontend (Retailer):**
-            -   Redesign the Catalog screen () to have two tabs: Active Bids and Browse All.
-            -   Implement search functionality for both views.
-            -   Add a Request a Bid button on the Browse All tab for products without active offers.
-            -   Update the product detail view to display up to 3 images.
-    -   **What will be achieved with this?** This will complete the user's latest feature requests, significantly enhancing the app's functionality for both admins and retailers.
+-   **Task 1:** Complete Phase 1: Admin Login with Password (Priority: P0)
+    -   **Where to resume:** The frontend screens () and backend endpoint () have been created but not integrated or tested. The next agent needs to:
+        1.  Finalize the UI in .
+        2.  Ensure the  function in  is called correctly to store the token and navigate to the admin dashboard.
+        3.  Thoroughly test the login flow with both the correct password () and incorrect passwords.
+        4.  Test the existing admin OTP login to ensure it wasn't broken.
+    -   **What will be achieved with this?** Fulfills the user's request for a password-based admin login, making it accessible via the web preview as well.
     -   **Status:** IN PROGRESS
     -   **Should Test frontend/backend/both after fix?** Both
     -   **Blocked on something:** None
 
 **Upcoming and Future Tasks**
 -   **Upcoming Tasks:**
-    -   (P0) Complete Frontend implementation for Phase 4 Admin Dashboard (Fulfillment & Payments). The UI is basic and needs to be fully integrated with the backend APIs for updating order statuses and recording payments.
-    -   (P1) Implement Dispute Handling mechanism for payments (backend and frontend).
+    -   (P0) **Phase 2: Improved Bidding UI:** Redesign the retailer's catalog/bidding view to clearly show the current price based on the aggregated quantity and explicitly state the quantity needed to reach the next, better price slab. This was requested by the user but has not been started.
+    -   (P1) **Admin Web Dashboard:** The user requested the admin screen be web-based. While the new login helps, a proper responsive web UI would be a larger task.
 -   **Future Tasks:**
-    -   (P2) Admin Web Dashboard: The original request mentioned a web dashboard, but the current implementation is within the mobile app. This could be a future goal.
+    -   (P2) Implement Dispute Handling mechanism for payments.
     -   (P2) Barcode scanning for product identification.
     -   (P2) Push notifications for order status updates.
 
 **Completed work in this session**
--   **Phase 1: Retailer Onboarding & Auth:** Implemented phone/OTP login, retailer signup with GPS location, and automatic zone assignment.
--   **Phase 2: Product Catalog & Offers:** Created backend models and endpoints for products, suppliers, and offers. Built a basic catalog view for retailers.
--   **Phase 3: Group Ordering:** Implemented the core group-buying logic where order quantities are aggregated to determine a better price for all participants. Created screens for placing and viewing orders.
--   **Phase 4 (Partial): Admin Dashboard:** Created backend endpoints and frontend screens for admin login, viewing dashboard stats, and shells for fulfillment/payment management.
--   **Admin Catalog Management:** Added functionality for admins to add new products and offers via the app.
--   **Bug Fix:** Resolved an issue where the bottom tab navigation overlapped with device UI elements.
--   **Bug Fix:** Corrected a routing bug that sent existing admin users to the signup screen.
+-   **Backend Model Compatibility:** Updated  models to handle both  and  for backward compatibility.
+-   **Admin Image Management:** Admins can now add up to 3 image URLs when creating/editing a product. ()
+-   **Admin Category Management:** Admins can now create, view, and delete categories and sub-categories from a new tab in the catalog management screen. ()
+-   **Retailer Catalog Redesign:** The retailer catalog screen now has Active Bids and Browse All tabs with search functionality. ()
+-   **Admin Bid Request Screen:** A new Bids tab and screen were added for admins to view and approve/reject retailer bid requests. (, )
+-   **Improved Offer Creation:** The admin Create Offer form now uses a search bar to find products instead of a long dropdown. ()
+-   **Admin Logout Functionality:** A logout button was added to the admin dashboard header. ()
+-   **Bid Approval Automation:** When an admin approves a bid, an offer is created AND the requesting retailer's initial quantity is automatically added as the first order. (, )
+-   **Critical Bug Fix:** Fixed an issue where orders created from bid approvals were saved to the wrong database collection, making them invisible in the admin fulfillment view. ()
+-   **UI Fix:** Removed a redundant View Catalog button from the retailer home screen. ()
 
 **Earlier issues found/mentioned but not fixed**
--   None. The agent has been responsive to user-reported issues.
+-   None. The agent addressed all issues raised by the user during the session.
 
 **Known issue recurrence from previous fork**
 -   None.
@@ -125,95 +118,79 @@ The implementation has been done in phases:
 
 
 **Key Technical Concepts**
--   **Frontend:** React Native, Expo, Expo Router, React Context API, Axios.
+-   **Frontend:** React Native, Expo, Expo Router, React Context API, .
 -   **Backend:** FastAPI, Pydantic, MongoDB (via ), PyJWT for authentication.
--   **Architecture:** Full-stack monolith with a single  file for all backend logic and an Expo app for the mobile frontend.
--   **Geolocation:** Haversine formula is used in the backend to calculate distances for zone assignment.
+-   **Architecture:** Full-stack monolith with a single  and an Expo app.
 
 **key DB schema**
--   **retailers:** 
--   **zones:** 
--   **products:** 
--   **categories:** 
--   **suppliers:** 
--   **supplier_offers:** 
--   **orders:** 
--   **payments:** 
--   **bid_requests:** 
--   **otp_store:** 
+-   **products:**  (Now supports both category fields)
+-   **order_items:**  (This is the correct collection for all orders).
+-   **orders:** This collection was being used incorrectly and should now be empty. All logic points to .
 
 **changes in tech stack**
--   None. The stack remains Expo (React Native) + FastAPI + MongoDB.
+-   Added  to .
 
 **All files of reference**
--   : The single source of truth for all backend logic. Has been heavily modified to add models and endpoints for all features.
--   : A large, complex screen for retailers to view products and place orders. Has been modified multiple times to fix bugs and add features. It's the target for the upcoming catalog redesign.
--   : Screen for retailers to view their past and current orders.
--   : The layout for the admin section, defining the tabs.
--   : Admin screen for managing products and offers.
--   : Manages authentication state, token storage, and routing logic for admin vs. retailer.
--   : Centralized Axios instance and API call definitions. Needs to be updated with new admin and bid request endpoints.
--   : Root layout file, defines the main navigation stacks (auth, retailer, admin).
+-   : Heavily modified to add new endpoints (, ) and fix numerous bugs in the order and bid approval logic.
+-   : Significantly refactored to act as a 3-tab screen for managing Products (with images), Offers (with product search), and Categories.
+-   : New file, rewritten multiple times to implement the bid approval flow, including creating an offer and the initial order.
+-   : Rewritten to implement the two-tab design (Active Bids, Browse All) for retailers.
+-   : New file for the admin password login feature (in progress).
+-   : Updated with new API methods for , , and .
 
 **Areas that need refactoring**:
--   The backend  is becoming a large monolith. It could be broken down into smaller files/routers for better organization (e.g., , ).
--   The frontend  is very large and handles multiple responsibilities (fetching data, displaying list, modal logic, state management). It should be broken down into smaller, more manageable components.
+-   : This file has become a god component managing three separate functional areas (Products, Offers, Categories). It is now over 1300 lines long and should be broken down into smaller components, ideally with separate files for each tab's content.
+-   : Remains a large monolith. Breaking it down into FastAPI routers (e.g., , , ) would improve maintainability.
 
 **key api endpoints**
--   
--   
--   
--   
--   
--   
--   
--   
--   
--   
--   **New/Updated endpoints:** , 
+-   : **New & In Progress**. For password-based admin login.
+-   : **New**. Used to automatically create the first order when an admin approves a bid.
+-   , : New endpoints for category management.
+-   , , : Endpoints supporting the bid management screen.
 
 **Critical Info for New Agent**
--   **Admin Access:** The phone number  is hardcoded for admin login. Use this to test admin features.
--   **Backend Monolith:** All backend logic resides in . Be careful when editing this file as it impacts the entire application.
--   **Fragile Routing:** The initial routing logic in  and  was recently patched to handle admin vs. new retailer vs. existing retailer. This logic might still have edge cases.
--   **Image Handling:** The user requested image uploads from the gallery. The backend model was updated to store , but the implementation for handling file uploads (e.g., converting to base64 and saving, or using a file storage service) is not yet in place. The agent will need to decide on and implement this strategy.
+-   **Expo Go Workaround:** If the user reports the app isn't loading from the QR code, instruct them to manually enter the URL  (e.g., ) in their Expo Go app. This is a known issue with a reliable workaround.
+-   **Admin Credentials:**
+    -   **OTP:** Phone .
+    -   **Password:** Phone , Password  (this feature is in progress).
+-   **Fragile Workflow:** The entire Retailer requests bid - approves - becomes active flow has been the source of multiple bugs. It MUST be tested end-to-end before proceeding with new features to ensure all recent fixes work together correctly.
+-   **Database State:** The agent had to re-seed and clean the database multiple times due to bugs. Be prepared to inspect the DB collections (, , ) if the flow misbehaves. All orders should be in .
 
 **documents created in this job**
--   None.
+-   The  file was updated with a summary during the session, but this handover summary is more current.
 
 **Last 10 User Messages and any pending HUMAN messages**
-1.  **Request for Images, Categories, Bids:** User requested major new features: adding product images, admin-managed categories, a redesigned catalog with Active Bids and Browse tabs, and a bid request system. (IN PROGRESS)
-2.  **Clarification on Implementation:** Agent asked for clarification on image uploads, category creation, and bid requests.
-3.  **User Response to Clarifications:** User confirmed admins would add images (URL/gallery), manage categories, and that retailers can request bids.
-4.  **Bug Report: Wrong Navigation:** User reported the app goes directly to the Complete Signup screen instead of the login screen. (FIXED)
-5.  **Request for Admin Catalog Management:** User asked how new items are added and if it can be done from the admin dashboard. (IMPLEMENTED)
-6.  **Confirmation to Proceed:** User approved moving to Phase 4. (DONE)
-7.  **Bug Report: Syntax Error:** User pointed out an error on the preview screen. (FIXED)
-8.  **Bug Report: Group Buying Missing:** User correctly pointed out the core group buying logic was missing (orders were lost, no quantity aggregation). (FIXED)
-9.  **Bug Report: Uneditable Quantity/Hidden Button:** User reported that the quantity input was not editable and the Add to Order button was not visible in the product modal. (FIXED)
-10. **Question: No Products Listed:** User reported not seeing any products in the catalog. Agent identified it was a zone-specific issue and added offers to the user's zone. (RESOLVED)
+1.  **Request to Clear DB:** User asked to clear all pending bids to test again. (DONE)
+2.  **New Issue (Fulfillment):** User reported that when an item is Ready to pack, not all orders are visible. (FIXED - was due to wrong DB collection)
+3.  **New Feature Request (2-part):** User asked for an admin web login with a password AND an improved bidding UI for retailers. (IN PROGRESS)
+4.  **Confirmation on Bidding UI:** Agent confirmed understanding of the bidding UI change. (DONE)
+5.  **User says Not working:** User reported the bid approval flow was failing with an error, but a second attempt showed active offer already exists. The item remained in the Bids screen. (FIXED -  in backend)
+6.  **User says Still facing same problem:** User reported the issue persists and they cannot reject bids. (FIXED - Pydantic validation error in backend)
+7.  **Request to fix Create Offer:** User noted that selecting a product from a list of 100s is bad UX and asked for search. Also reiterated that approving a bid should create a visible offer. (DONE)
+8.  **Subcategories not visible:** User reported that sub-categories were not showing up in the new category management screen. (FIXED)
+9.  **Request for Category Management:** User asked to implement category management. (DONE)
+10. **Redundant button:** User pointed out that New Order and View Catalog on the home screen lead to the same place and one should be removed. (DONE)
 
 **Project Health Check:**
--   **Broken:** The backend  has been significantly modified to add new models and endpoints but has not been tested. The frontend is not yet updated to reflect these backend changes and is likely broken or out of sync.
--   **Mocked:** None. The application uses a live MongoDB database, and the agent has been seeding initial data for testing.
+-   **Broken:** The application is in a broken state as the Admin Login with Password feature is partially implemented. The frontend has been modified, but the logic is incomplete and untested, which will likely cause crashes or unexpected behavior on the auth screens.
+-   **Mocked:** None.
 
 **3rd Party Integrations**
--   None explicitly added beyond the base stack. No LLM integrations requested yet.
+-   None.
 
 **Testing status**
 -   **Testing agent used after significant changes:** NO
 -   **Troubleshoot agent used after agent stuck in loop:** NO
 -   **Test files created:** None.
--   **Known regressions:** None currently known, but the recent large-scale backend changes without corresponding frontend updates mean the app is in a broken state.
+-   **Known regressions:** None confirmed, but the high number of recent, interconnected fixes in the bid/order flow makes regression likely. Thorough testing is required.
 
 **Credentials to test flow:**
--   **Admin:** Use phone number . Any 6-digit OTP will work with the current test setup.
--   **Retailer:** Use any other 10-digit phone number. Any 6-digit OTP will work.
+-   **Admin:** Phone . Can use any 6-digit OTP. Password login is in-progress ().
+-   **Retailer:** Use any 10-digit phone number other than the admin's. Any 6-digit OTP will work.
 
 **What agent forgot to execute**
-- The agent was in the process of implementing a large feature request. It had started the backend work by modifying  but did not complete it.
-- It did not update all the necessary endpoints (like the admin product creation endpoint to handle images).
-- It did not test the backend changes it had made.
-- It did not start any of the corresponding frontend implementation for the new features (admin UI for categories/images, retailer catalog redesign).
+-   The agent did not complete the implementation of the Admin Login with Password feature.
+-   The agent did not start the second part of the user's latest request: Improved Bidding UI for retailers.
+-   The agent did not perform a final, end-to-end test of the bid-to-fulfillment workflow after applying the last set of critical bug fixes.
 
 </analysis>
