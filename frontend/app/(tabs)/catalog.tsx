@@ -8,8 +8,12 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Modal,
+  TextInput,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
 import { api } from '../../src/services/api';
@@ -48,6 +52,7 @@ interface Zone {
 
 export default function CatalogScreen() {
   const { retailer } = useAuth();
+  const insets = useSafeAreaInsets();
   const [zones, setZones] = useState<Zone[]>([]);
   const [selectedZone, setSelectedZone] = useState<Zone | null>(null);
   const [offers, setOffers] = useState<SupplierOffer[]>([]);
@@ -58,6 +63,7 @@ export default function CatalogScreen() {
   const [offerModalVisible, setOfferModalVisible] = useState(false);
   const [filterCategory, setFilterCategory] = useState<string | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
+  const [orderQuantity, setOrderQuantity] = useState('');
 
   useEffect(() => {
     fetchZones();
@@ -117,6 +123,60 @@ export default function CatalogScreen() {
     return Math.min(...slabs.map(s => s.price_per_unit));
   };
 
+  const getCurrentPrice = (slabs: QuantitySlab[], qty: number) => {
+    for (const slab of slabs) {
+      if (qty >= slab.min_qty && (slab.max_qty === null || qty <= slab.max_qty)) {
+        return slab.price_per_unit;
+      }
+    }
+    return slabs[0].price_per_unit;
+  };
+
+  const openOfferModal = (offer: SupplierOffer) => {
+    setSelectedOffer(offer);
+    setOrderQuantity('');
+    setOfferModalVisible(true);
+  };
+
+  const handleAddToOrder = () => {
+    const qty = parseInt(orderQuantity);
+    if (!qty || qty <= 0) {
+      Alert.alert('Invalid Quantity', 'Please enter a valid quantity greater than 0');
+      return;
+    }
+
+    if (selectedOffer) {
+      const price = getCurrentPrice(selectedOffer.quantity_slabs, qty);
+      const total = price * qty;
+      
+      Alert.alert(
+        'Order Added',
+        `Added ${qty} ${selectedOffer.product_unit} of ${selectedOffer.product_name}\n\nPrice: ₹${price}/${selectedOffer.product_unit}\nTotal: ₹${total}`,
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              setOfferModalVisible(false);
+              setOrderQuantity('');
+            },
+          },
+        ]
+      );
+    }
+  };
+
+  const incrementQuantity = () => {
+    const current = parseInt(orderQuantity) || 0;
+    setOrderQuantity((current + 1).toString());
+  };
+
+  const decrementQuantity = () => {
+    const current = parseInt(orderQuantity) || 0;
+    if (current > 0) {
+      setOrderQuantity((current - 1).toString());
+    }
+  };
+
   const filteredOffers = filterCategory
     ? offers.filter(o => o.product_category === filterCategory)
     : offers;
@@ -125,10 +185,7 @@ export default function CatalogScreen() {
     <TouchableOpacity
       key={offer.id}
       style={styles.offerCard}
-      onPress={() => {
-        setSelectedOffer(offer);
-        setOfferModalVisible(true);
-      }}
+      onPress={() => openOfferModal(offer)}
     >
       <View style={styles.offerHeader}>
         <View style={styles.productInfo}>
@@ -267,7 +324,7 @@ export default function CatalogScreen() {
         onRequestClose={() => setZoneModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { paddingBottom: insets.bottom + 24 }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Select Zone</Text>
               <TouchableOpacity onPress={() => setZoneModalVisible(false)}>
@@ -305,12 +362,15 @@ export default function CatalogScreen() {
         animationType="slide"
         onRequestClose={() => setOfferModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <View style={[styles.modalContent, { paddingBottom: insets.bottom + 24 }]}>
             {selectedOffer && (
-              <>
+              <ScrollView showsVerticalScrollIndicator={false}>
                 <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>{selectedOffer.product_name}</Text>
+                  <Text style={styles.modalTitle} numberOfLines={2}>{selectedOffer.product_name}</Text>
                   <TouchableOpacity onPress={() => setOfferModalVisible(false)}>
                     <Ionicons name="close" size={24} color="#fff" />
                   </TouchableOpacity>
@@ -333,7 +393,7 @@ export default function CatalogScreen() {
                     <Text style={styles.detailLabel}>Supplier</Text>
                     <Text style={styles.detailValue}>{selectedOffer.supplier_name}</Text>
                   </View>
-                  <View style={styles.detailRow}>
+                  <View style={[styles.detailRow, { borderBottomWidth: 0 }]}>
                     <Text style={styles.detailLabel}>Lead Time</Text>
                     <Text style={styles.detailValue}>{selectedOffer.lead_time_days} days</Text>
                   </View>
@@ -357,14 +417,51 @@ export default function CatalogScreen() {
                   </Text>
                 </View>
 
-                <TouchableOpacity style={styles.orderButton}>
+                {/* Quantity Input Section */}
+                <View style={styles.quantitySection}>
+                  <Text style={styles.quantityLabel}>Enter Quantity ({selectedOffer.product_unit})</Text>
+                  <View style={styles.quantityInputRow}>
+                    <TouchableOpacity style={styles.quantityButton} onPress={decrementQuantity}>
+                      <Ionicons name="remove" size={24} color="#fff" />
+                    </TouchableOpacity>
+                    <TextInput
+                      style={styles.quantityInput}
+                      value={orderQuantity}
+                      onChangeText={setOrderQuantity}
+                      keyboardType="number-pad"
+                      placeholder="0"
+                      placeholderTextColor="#666"
+                    />
+                    <TouchableOpacity style={styles.quantityButton} onPress={incrementQuantity}>
+                      <Ionicons name="add" size={24} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
+                  
+                  {orderQuantity && parseInt(orderQuantity) > 0 && (
+                    <View style={styles.pricePreview}>
+                      <Text style={styles.pricePreviewLabel}>Your Price:</Text>
+                      <Text style={styles.pricePreviewValue}>
+                        ₹{getCurrentPrice(selectedOffer.quantity_slabs, parseInt(orderQuantity))}/{selectedOffer.product_unit}
+                      </Text>
+                      <Text style={styles.totalPreview}>
+                        Total: ₹{getCurrentPrice(selectedOffer.quantity_slabs, parseInt(orderQuantity)) * parseInt(orderQuantity)}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
+                <TouchableOpacity 
+                  style={[styles.orderButton, (!orderQuantity || parseInt(orderQuantity) <= 0) && styles.orderButtonDisabled]} 
+                  onPress={handleAddToOrder}
+                  disabled={!orderQuantity || parseInt(orderQuantity) <= 0}
+                >
                   <Ionicons name="cart" size={20} color="#fff" />
                   <Text style={styles.orderButtonText}>Add to Order</Text>
                 </TouchableOpacity>
-              </>
+              </ScrollView>
             )}
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -574,12 +671,12 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
-    maxHeight: '80%',
+    maxHeight: '85%',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 20,
   },
   modalTitle: {
@@ -587,6 +684,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     flex: 1,
+    marginRight: 16,
   },
   zoneOption: {
     flexDirection: 'row',
@@ -656,13 +754,70 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(108, 92, 231, 0.1)',
     padding: 12,
     borderRadius: 12,
-    marginTop: 16,
+    marginTop: 8,
     gap: 8,
   },
   fulfillmentText: {
     color: '#a0a0a0',
     fontSize: 12,
     flex: 1,
+  },
+  quantitySection: {
+    marginTop: 20,
+    backgroundColor: '#0f0f1a',
+    borderRadius: 12,
+    padding: 16,
+  },
+  quantityLabel: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  quantityInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  quantityButton: {
+    width: 48,
+    height: 48,
+    backgroundColor: '#6c5ce7',
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quantityInput: {
+    flex: 1,
+    backgroundColor: '#1a1a2e',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#2d2d44',
+    color: '#fff',
+    fontSize: 24,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    padding: 12,
+    height: 56,
+  },
+  pricePreview: {
+    marginTop: 16,
+    alignItems: 'center',
+  },
+  pricePreviewLabel: {
+    color: '#a0a0a0',
+    fontSize: 12,
+  },
+  pricePreviewValue: {
+    color: '#27ae60',
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  totalPreview: {
+    color: '#6c5ce7',
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 4,
   },
   orderButton: {
     flexDirection: 'row',
@@ -671,8 +826,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#6c5ce7',
     padding: 16,
     borderRadius: 12,
-    marginTop: 16,
+    marginTop: 20,
     gap: 8,
+  },
+  orderButtonDisabled: {
+    backgroundColor: '#4a4a5e',
   },
   orderButtonText: {
     color: '#fff',
