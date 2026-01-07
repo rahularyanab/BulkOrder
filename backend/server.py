@@ -1276,6 +1276,16 @@ async def create_order_for_retailer(retailer_id: str, offer_id: str, quantity: i
     if offer["status"] not in ["open", "ready_to_pack"]:
         raise HTTPException(status_code=400, detail="Offer is not accepting orders")
     
+    # Get product details
+    product = await db.products.find_one({"id": offer["product_id"]})
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    
+    # Get supplier details
+    supplier = await db.suppliers.find_one({"id": offer["supplier_id"]})
+    if not supplier:
+        raise HTTPException(status_code=404, detail="Supplier not found")
+    
     # Calculate price based on slabs (using new aggregated quantity)
     new_total_qty = offer["current_aggregated_qty"] + quantity
     price_per_unit = offer["quantity_slabs"][0]["price_per_unit"]  # Default to first slab
@@ -1285,10 +1295,19 @@ async def create_order_for_retailer(retailer_id: str, offer_id: str, quantity: i
             price_per_unit = slab["price_per_unit"]
             break
     
-    # Create the order using OrderItem model
+    # Create the order using OrderItem model with all required fields
     order = OrderItem(
         retailer_id=retailer_id,
+        retailer_name=retailer.get("shop_name", retailer.get("phone", "Unknown")),
         offer_id=offer_id,
+        zone_id=offer["zone_id"],
+        product_id=product["id"],
+        product_name=product["name"],
+        product_brand=product["brand"],
+        product_unit=product["unit"],
+        supplier_id=supplier["id"],
+        supplier_name=supplier["name"],
+        supplier_code=supplier["code"],
         quantity=quantity,
         price_per_unit=price_per_unit,
         total_amount=quantity * price_per_unit,
