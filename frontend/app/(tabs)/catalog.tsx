@@ -346,76 +346,110 @@ export default function CatalogScreen() {
     return matchesSearch;
   });
 
-  const renderOfferCard = (offer: SupplierOffer, showBidStatus: boolean = false) => (
-    <TouchableOpacity
-      key={offer.id}
-      style={styles.offerCard}
-      onPress={() => openOfferModal(offer)}
-    >
-      <View style={styles.offerHeader}>
-        <View style={styles.productInfo}>
-          {offer.product_images && offer.product_images.length > 0 ? (
-            <Image source={{ uri: offer.product_images[0] }} style={styles.productImage} />
-          ) : (
-            <View style={styles.productIcon}>
-              <Ionicons name="cube" size={24} color="#6c5ce7" />
+  const renderOfferCard = (offer: SupplierOffer, showBidStatus: boolean = false) => {
+    const nextSlabInfo = getNextSlabInfo(offer.quantity_slabs, offer.current_aggregated_qty);
+    
+    return (
+      <TouchableOpacity
+        key={offer.id}
+        style={styles.offerCard}
+        onPress={() => openOfferModal(offer)}
+      >
+        <View style={styles.offerHeader}>
+          <View style={styles.productInfo}>
+            {offer.product_images && offer.product_images.length > 0 ? (
+              <Image source={{ uri: offer.product_images[0] }} style={styles.productImage} />
+            ) : (
+              <View style={styles.productIcon}>
+                <Ionicons name="cube" size={24} color="#6c5ce7" />
+              </View>
+            )}
+            <View style={styles.productDetails}>
+              <Text style={styles.productName}>{offer.product_name}</Text>
+              <Text style={styles.productBrand}>{offer.product_brand}</Text>
+            </View>
+          </View>
+          <View style={[styles.supplierBadge, { backgroundColor: getSupplierColor(offer.supplier_code) }]}>
+            <Text style={styles.supplierCode}>{offer.supplier_code}</Text>
+          </View>
+        </View>
+
+        {/* Improved Price Display */}
+        <View style={styles.priceSection}>
+          <View style={styles.currentPriceBox}>
+            <Text style={styles.currentPriceLabel}>Current Price</Text>
+            <Text style={styles.currentPriceValue}>
+              ₹{nextSlabInfo.currentPrice}/{offer.product_unit}
+            </Text>
+            <Text style={styles.aggregatedQty}>
+              {offer.current_aggregated_qty} {offer.product_unit} ordered
+            </Text>
+          </View>
+          
+          {nextSlabInfo.hasNextSlab && (
+            <View style={styles.nextSlabBox}>
+              <View style={styles.nextSlabHeader}>
+                <Ionicons name="trending-down" size={16} color="#27ae60" />
+                <Text style={styles.nextSlabTitle}>Next Price</Text>
+              </View>
+              <Text style={styles.nextSlabPrice}>
+                ₹{nextSlabInfo.nextPrice}/{offer.product_unit}
+              </Text>
+              <View style={styles.savingsTag}>
+                <Text style={styles.savingsText}>
+                  Add {nextSlabInfo.qtyNeeded} more to save ₹{nextSlabInfo.savings}/unit
+                </Text>
+              </View>
             </View>
           )}
-          <View style={styles.productDetails}>
-            <Text style={styles.productName}>{offer.product_name}</Text>
-            <Text style={styles.productBrand}>{offer.product_brand}</Text>
-          </View>
+          
+          {!nextSlabInfo.hasNextSlab && (
+            <View style={styles.bestPriceBox}>
+              <Ionicons name="checkmark-circle" size={20} color="#27ae60" />
+              <Text style={styles.bestPriceText}>Best Price!</Text>
+            </View>
+          )}
         </View>
-        <View style={[styles.supplierBadge, { backgroundColor: getSupplierColor(offer.supplier_code) }]}>
-          <Text style={styles.supplierCode}>{offer.supplier_code}</Text>
-        </View>
-      </View>
 
-      <View style={styles.priceRow}>
-        <View>
-          <Text style={styles.priceLabel}>Best Price</Text>
-          <Text style={styles.priceValue}>
-            ₹{getBestPrice(offer.quantity_slabs)}/{offer.product_unit}
-          </Text>
-        </View>
-        <View style={styles.minQtyInfo}>
-          <Text style={styles.minQtyLabel}>Min Qty: {offer.min_fulfillment_qty}</Text>
-          <Text style={styles.leadTime}>{offer.lead_time_days} days delivery</Text>
-        </View>
-      </View>
-
-      {/* Progress bar */}
-      <View style={styles.progressSection}>
-        <View style={styles.progressHeader}>
-          <Text style={styles.progressLabel}>
-            {offer.current_aggregated_qty}/{offer.min_fulfillment_qty} ordered
-          </Text>
-          <Text style={styles.progressPercent}>{Math.round(offer.progress_percentage)}%</Text>
-        </View>
-        <View style={styles.progressBarBg}>
-          <View
-            style={[
-              styles.progressBarFill,
-              { width: `${Math.min(offer.progress_percentage, 100)}%` },
-              offer.progress_percentage >= 100 && styles.progressBarComplete,
-            ]}
-          />
-        </View>
-        {offer.status === 'ready_to_pack' && (
-          <View style={styles.readyBadge}>
-            <Ionicons name="checkmark-circle" size={14} color="#27ae60" />
-            <Text style={styles.readyText}>Ready to Pack</Text>
+        {/* Progress bar */}
+        <View style={styles.progressSection}>
+          <View style={styles.progressHeader}>
+            <Text style={styles.progressLabel}>
+              {offer.current_aggregated_qty}/{offer.min_fulfillment_qty} for fulfillment
+            </Text>
+            <Text style={styles.progressPercent}>{Math.round(offer.progress_percentage)}%</Text>
           </View>
-        )}
-        {showBidStatus && offer.current_aggregated_qty > 0 && offer.status !== 'ready_to_pack' && (
-          <View style={styles.activeBidBadge}>
-            <Ionicons name="flame" size={14} color="#f39c12" />
-            <Text style={styles.activeBidText}>Active Group Bid</Text>
+          <View style={styles.progressBarBg}>
+            <View
+              style={[
+                styles.progressBarFill,
+                { width: `${Math.min(offer.progress_percentage, 100)}%` },
+                offer.progress_percentage >= 100 && styles.progressBarComplete,
+              ]}
+            />
           </View>
-        )}
-      </View>
-    </TouchableOpacity>
-  );
+          {offer.status === 'ready_to_pack' && (
+            <View style={styles.readyBadge}>
+              <Ionicons name="checkmark-circle" size={14} color="#27ae60" />
+              <Text style={styles.readyText}>Ready to Pack</Text>
+            </View>
+          )}
+          {showBidStatus && offer.current_aggregated_qty > 0 && offer.status !== 'ready_to_pack' && (
+            <View style={styles.activeBidBadge}>
+              <Ionicons name="flame" size={14} color="#f39c12" />
+              <Text style={styles.activeBidText}>Active Group Bid</Text>
+            </View>
+          )}
+        </View>
+        
+        {/* Lead time info */}
+        <View style={styles.leadTimeRow}>
+          <Ionicons name="time-outline" size={14} color="#666" />
+          <Text style={styles.leadTimeText}>{offer.lead_time_days} days delivery</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   const renderProductCard = (product: Product) => (
     <View key={product.id} style={styles.productCard}>
