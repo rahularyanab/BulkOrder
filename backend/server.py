@@ -1164,7 +1164,7 @@ async def get_all_orders(admin=Depends(get_admin_user), status: Optional[str] = 
         query["zone_id"] = zone_id
     
     orders = await db.order_items.find(query).sort("created_at", -1).to_list(1000)
-    return orders
+    return [{k: v for k, v in o.items() if k != "_id"} for o in orders]
 
 # ===================== ADMIN PAYMENT ENDPOINTS =====================
 
