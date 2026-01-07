@@ -656,11 +656,13 @@ async def get_supplier(supplier_id: str):
 # ===================== PRODUCT ENDPOINTS =====================
 
 @api_router.get("/products")
-async def get_all_products(category_id: Optional[str] = None, brand: Optional[str] = None, search: Optional[str] = None):
+async def get_all_products(category_id: Optional[str] = None, category: Optional[str] = None, brand: Optional[str] = None, search: Optional[str] = None):
     """Get all active products with optional filters"""
     query = {"is_active": True}
     if category_id:
         query["category_id"] = category_id
+    if category:
+        query["category"] = category
     if brand:
         query["brand"] = brand
     
@@ -674,9 +676,13 @@ async def get_all_products(category_id: Optional[str] = None, brand: Optional[st
     result = []
     for p in products:
         p_dict = {k: v for k, v in p.items() if k != "_id"}
-        # Get category name
-        category = await db.categories.find_one({"id": p.get("category_id")})
-        p_dict["category_name"] = category["name"] if category else "Uncategorized"
+        # Get category name - support both category_id and category string
+        if p.get("category_id"):
+            cat_doc = await db.categories.find_one({"id": p.get("category_id")})
+            p_dict["category_name"] = cat_doc["name"] if cat_doc else p.get("category", "Uncategorized")
+        else:
+            p_dict["category_name"] = p.get("category", "Uncategorized")
+        
         if p.get("subcategory_id"):
             subcategory = await db.categories.find_one({"id": p.get("subcategory_id")})
             p_dict["subcategory_name"] = subcategory["name"] if subcategory else None
