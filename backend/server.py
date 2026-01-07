@@ -122,6 +122,21 @@ class Supplier(BaseModel):
     is_active: bool = True
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
+# ===================== CATEGORY MODELS =====================
+
+class CategoryCreate(BaseModel):
+    name: str
+    parent_id: Optional[str] = None  # For subcategories
+    description: Optional[str] = None
+
+class Category(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    parent_id: Optional[str] = None  # None means top-level category
+    description: Optional[str] = None
+    is_active: bool = True
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
 # ===================== PRODUCT MODELS =====================
 
 class ProductCreate(BaseModel):
@@ -129,18 +144,20 @@ class ProductCreate(BaseModel):
     brand: str
     barcode: Optional[str] = None
     unit: str  # e.g., "kg", "piece", "pack", "litre"
-    category: str
+    category_id: str  # Reference to category
+    subcategory_id: Optional[str] = None  # Reference to subcategory
     description: Optional[str] = None
-    image_base64: Optional[str] = None
+    images: Optional[List[str]] = []  # Up to 3 base64 images
 
 class ProductUpdate(BaseModel):
     name: Optional[str] = None
     brand: Optional[str] = None
     barcode: Optional[str] = None
     unit: Optional[str] = None
-    category: Optional[str] = None
+    category_id: Optional[str] = None
+    subcategory_id: Optional[str] = None
     description: Optional[str] = None
-    image_base64: Optional[str] = None
+    images: Optional[List[str]] = None
 
 class Product(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -148,12 +165,35 @@ class Product(BaseModel):
     brand: str
     barcode: Optional[str] = None
     unit: str
-    category: str
+    category_id: str
+    subcategory_id: Optional[str] = None
     description: Optional[str] = None
-    image_base64: Optional[str] = None
+    images: List[str] = []  # Up to 3 base64 images
     is_active: bool = True
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+# ===================== BID REQUEST MODELS =====================
+
+class BidRequestCreate(BaseModel):
+    product_id: str
+    zone_id: str
+    requested_quantity: int
+    notes: Optional[str] = None
+
+class BidRequest(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    product_id: str
+    product_name: str
+    product_brand: str
+    zone_id: str
+    zone_name: str
+    retailer_id: str
+    retailer_name: str
+    requested_quantity: int
+    notes: Optional[str] = None
+    status: str = "pending"  # pending, approved, rejected
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
 # ===================== SUPPLIER OFFER MODELS =====================
 
