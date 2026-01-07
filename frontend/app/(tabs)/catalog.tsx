@@ -179,6 +179,46 @@ export default function CatalogScreen() {
     return slabs[0].price_per_unit;
   };
 
+  // Get the current slab index based on quantity
+  const getCurrentSlabIndex = (slabs: QuantitySlab[], qty: number): number => {
+    for (let i = 0; i < slabs.length; i++) {
+      const slab = slabs[i];
+      if (qty >= slab.min_qty && (slab.max_qty === null || qty <= slab.max_qty)) {
+        return i;
+      }
+    }
+    return 0;
+  };
+
+  // Get next slab info for incentive display
+  const getNextSlabInfo = (slabs: QuantitySlab[], currentQty: number): {
+    hasNextSlab: boolean;
+    nextPrice?: number;
+    qtyNeeded?: number;
+    savings?: number;
+    currentPrice: number;
+  } => {
+    const currentSlabIndex = getCurrentSlabIndex(slabs, currentQty);
+    const currentPrice = slabs[currentSlabIndex].price_per_unit;
+    
+    // If we're at the last slab or current slab has no max, no next slab
+    if (currentSlabIndex >= slabs.length - 1 || slabs[currentSlabIndex].max_qty === null) {
+      return { hasNextSlab: false, currentPrice };
+    }
+    
+    const nextSlab = slabs[currentSlabIndex + 1];
+    const qtyNeeded = nextSlab.min_qty - currentQty;
+    const savingsPerUnit = currentPrice - nextSlab.price_per_unit;
+    
+    return {
+      hasNextSlab: true,
+      nextPrice: nextSlab.price_per_unit,
+      qtyNeeded,
+      savings: savingsPerUnit,
+      currentPrice,
+    };
+  };
+
   const openOfferModal = (offer: SupplierOffer) => {
     setSelectedOffer(offer);
     setOrderQuantity('');
