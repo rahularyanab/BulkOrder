@@ -867,15 +867,6 @@ export default function CatalogManagementScreen() {
                   <Ionicons name="chevron-forward" size={20} color="#666" />
                 </TouchableOpacity>
               </View>
-                  <TextInput
-                    style={styles.input}
-                    value={productCategory}
-                    onChangeText={setProductCategory}
-                    placeholder="e.g., Grocery, Snacks, Personal Care"
-                    placeholderTextColor="#666"
-                  />
-                )}
-              </View>
 
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Unit *</Text>
