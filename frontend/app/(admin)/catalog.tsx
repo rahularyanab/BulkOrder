@@ -1624,14 +1624,30 @@ const styles = StyleSheet.create({
   categorySelectScroll: {
     marginTop: 8,
   },
+  categorySelectContainer: {
+    marginTop: 8,
+  },
+  categoryGroupLabel: {
+    color: '#a0a0a0',
+    fontSize: 12,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
   categorySelectChip: {
-    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 20,
     backgroundColor: '#0f0f1a',
     marginRight: 8,
     borderWidth: 1,
     borderColor: '#2d2d44',
+    gap: 6,
+  },
+  subcategoryChip: {
+    borderColor: 'rgba(39, 174, 96, 0.3)',
   },
   categorySelectChipActive: {
     backgroundColor: '#6c5ce7',
