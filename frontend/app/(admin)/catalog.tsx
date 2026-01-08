@@ -1074,6 +1074,134 @@ export default function CatalogManagementScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Category Picker Modal */}
+      <Modal
+        visible={categoryPickerVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setCategoryPickerVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: '80%', paddingBottom: insets.bottom + 24 }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Category</Text>
+              <TouchableOpacity onPress={() => {
+                setCategoryPickerVisible(false);
+                setExpandedCategory(null);
+              }}>
+                <Ionicons name="close" size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.categoryPickerList} showsVerticalScrollIndicator={false}>
+              {categories.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Ionicons name="folder-open-outline" size={48} color="#666" />
+                  <Text style={styles.emptyTitle}>No Categories</Text>
+                  <Text style={styles.emptySubtitle}>Go to Categories tab to create categories first</Text>
+                </View>
+              ) : (
+                categories.map((cat) => (
+                  <View key={cat.id}>
+                    {/* Parent Category Row */}
+                    <TouchableOpacity
+                      style={[
+                        styles.categoryPickerItem,
+                        productCategory === cat.name && styles.categoryPickerItemSelected,
+                      ]}
+                      onPress={() => {
+                        if (cat.subcategories && cat.subcategories.length > 0) {
+                          // Toggle expand if has subcategories
+                          setExpandedCategory(expandedCategory === cat.id ? null : cat.id);
+                        } else {
+                          // Select if no subcategories
+                          setProductCategory(cat.name);
+                          setCategoryPickerVisible(false);
+                          setExpandedCategory(null);
+                        }
+                      }}
+                    >
+                      <View style={styles.categoryPickerItemLeft}>
+                        <View style={[styles.categoryPickerIcon, { backgroundColor: 'rgba(108, 92, 231, 0.2)' }]}>
+                          <Ionicons name="folder" size={20} color="#6c5ce7" />
+                        </View>
+                        <View>
+                          <Text style={styles.categoryPickerItemName}>{cat.name}</Text>
+                          {cat.subcategories && cat.subcategories.length > 0 && (
+                            <Text style={styles.categoryPickerItemCount}>
+                              {cat.subcategories.length} subcategories
+                            </Text>
+                          )}
+                        </View>
+                      </View>
+                      <View style={styles.categoryPickerItemRight}>
+                        {productCategory === cat.name && (
+                          <Ionicons name="checkmark-circle" size={22} color="#27ae60" />
+                        )}
+                        {cat.subcategories && cat.subcategories.length > 0 && (
+                          <Ionicons 
+                            name={expandedCategory === cat.id ? "chevron-down" : "chevron-forward"} 
+                            size={20} 
+                            color="#666" 
+                          />
+                        )}
+                      </View>
+                    </TouchableOpacity>
+
+                    {/* Subcategories (Collapsible) */}
+                    {expandedCategory === cat.id && cat.subcategories && cat.subcategories.map((sub) => (
+                      <TouchableOpacity
+                        key={sub.id}
+                        style={[
+                          styles.categoryPickerItem,
+                          styles.categoryPickerSubItem,
+                          productCategory === sub.name && styles.categoryPickerItemSelected,
+                        ]}
+                        onPress={() => {
+                          setProductCategory(sub.name);
+                          setCategoryPickerVisible(false);
+                          setExpandedCategory(null);
+                        }}
+                      >
+                        <View style={styles.categoryPickerItemLeft}>
+                          <View style={[styles.categoryPickerIcon, { backgroundColor: 'rgba(39, 174, 96, 0.2)' }]}>
+                            <Ionicons name="folder-outline" size={18} color="#27ae60" />
+                          </View>
+                          <Text style={styles.categoryPickerItemName}>{sub.name}</Text>
+                        </View>
+                        {productCategory === sub.name && (
+                          <Ionicons name="checkmark-circle" size={22} color="#27ae60" />
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                ))
+              )}
+            </ScrollView>
+
+            {/* Quick select parent category button */}
+            {expandedCategory && (
+              <TouchableOpacity
+                style={styles.selectParentButton}
+                onPress={() => {
+                  const parent = categories.find(c => c.id === expandedCategory);
+                  if (parent) {
+                    setProductCategory(parent.name);
+                    setCategoryPickerVisible(false);
+                    setExpandedCategory(null);
+                  }
+                }}
+              >
+                <Ionicons name="checkmark" size={18} color="#fff" />
+                <Text style={styles.selectParentButtonText}>
+                  Select "{categories.find(c => c.id === expandedCategory)?.name}" as category
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
