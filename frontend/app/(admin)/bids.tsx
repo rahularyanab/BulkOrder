@@ -411,7 +411,7 @@ export default function AdminBidsScreen() {
                   <View style={styles.detailCard}>
                     <View style={styles.detailRow}>
                       <Text style={styles.detailLabel}>Shop</Text>
-                      <Text style={styles.detailValue}>{selectedBid.retailer_shop || 'N/A'}</Text>
+                      <Text style={styles.detailValue}>{selectedBid.retailer_name || selectedBid.retailer_shop || 'N/A'}</Text>
                     </View>
                     <View style={[styles.detailRow, { borderBottomWidth: 0 }]}>
                       <Text style={styles.detailLabel}>Zone</Text>
