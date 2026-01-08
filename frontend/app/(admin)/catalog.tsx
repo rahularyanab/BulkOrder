@@ -1747,6 +1747,97 @@ const styles = StyleSheet.create({
   categorySelectTextActive: {
     color: '#fff',
   },
+  // Category Picker Button (New Product Screen)
+  categoryPickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#0f0f1a',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: '#2d2d44',
+  },
+  categoryPickerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  categoryPickerText: {
+    color: '#fff',
+    fontSize: 16,
+  },
+  categoryPickerPlaceholder: {
+    color: '#666',
+    fontSize: 16,
+  },
+  // Category Picker Modal
+  categoryPickerList: {
+    flex: 1,
+  },
+  categoryPickerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#1a1a2e',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginBottom: 8,
+  },
+  categoryPickerSubItem: {
+    marginLeft: 24,
+    backgroundColor: '#0f0f1a',
+  },
+  categoryPickerItemSelected: {
+    borderWidth: 1,
+    borderColor: '#27ae60',
+  },
+  categoryPickerItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  categoryPickerItemRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  categoryPickerIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  categoryPickerItemName: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  categoryPickerItemCount: {
+    color: '#666',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  selectParentButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#6c5ce7',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    marginTop: 12,
+    gap: 8,
+  },
+  selectParentButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
   unitSelection: {
     flexDirection: 'row',
     flexWrap: 'wrap',
