@@ -83,7 +83,11 @@ export default function CatalogManagementScreen() {
   const [productImages, setProductImages] = useState<string[]>([]);
   const [imageUrlInput, setImageUrlInput] = useState('');
   
-  // Category Modal
+  // Category Picker Modal (for selecting category when adding product)
+  const [categoryPickerVisible, setCategoryPickerVisible] = useState(false);
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
+  
+  // Category Management Modal (for creating categories)
   const [categoryModalVisible, setCategoryModalVisible] = useState(false);
   const [categoryName, setCategoryName] = useState('');
   const [categoryDescription, setCategoryDescription] = useState('');
