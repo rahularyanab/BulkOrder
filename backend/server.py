@@ -141,7 +141,7 @@ class Category(BaseModel):
 
 class ProductCreate(BaseModel):
     name: str
-    brand: str
+    brand: Optional[str] = None
     barcode: Optional[str] = None
     unit: str  # e.g., "kg", "piece", "pack", "litre"
     category: Optional[str] = None  # Backward compatible - category name as string
