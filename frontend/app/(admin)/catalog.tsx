@@ -847,62 +847,26 @@ export default function CatalogManagementScreen() {
 
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Category *</Text>
-                {categories.length > 0 ? (
-                  <View style={styles.categorySelectContainer}>
-                    {/* Parent Categories */}
-                    <Text style={styles.categoryGroupLabel}>Categories</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categorySelectScroll}>
-                      {categories.map((cat) => (
-                        <TouchableOpacity
-                          key={cat.id}
-                          style={[
-                            styles.categorySelectChip,
-                            productCategory === cat.name && styles.categorySelectChipActive,
-                          ]}
-                          onPress={() => setProductCategory(cat.name)}
-                        >
-                          <Ionicons name="folder" size={14} color={productCategory === cat.name ? '#fff' : '#6c5ce7'} />
-                          <Text style={[
-                            styles.categorySelectText,
-                            productCategory === cat.name && styles.categorySelectTextActive,
-                          ]}>
-                            {cat.name}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </ScrollView>
-                    
-                    {/* Subcategories */}
-                    {categories.some(cat => cat.subcategories && cat.subcategories.length > 0) && (
+                <TouchableOpacity
+                  style={styles.categoryPickerButton}
+                  onPress={() => setCategoryPickerVisible(true)}
+                >
+                  <View style={styles.categoryPickerContent}>
+                    {productCategory ? (
                       <>
-                        <Text style={[styles.categoryGroupLabel, { marginTop: 12 }]}>Subcategories</Text>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categorySelectScroll}>
-                          {categories.flatMap((cat) => 
-                            (cat.subcategories || []).map((sub) => (
-                              <TouchableOpacity
-                                key={sub.id}
-                                style={[
-                                  styles.categorySelectChip,
-                                  styles.subcategoryChip,
-                                  productCategory === sub.name && styles.categorySelectChipActive,
-                                ]}
-                                onPress={() => setProductCategory(sub.name)}
-                              >
-                                <Ionicons name="folder-outline" size={14} color={productCategory === sub.name ? '#fff' : '#27ae60'} />
-                                <Text style={[
-                                  styles.categorySelectText,
-                                  productCategory === sub.name && styles.categorySelectTextActive,
-                                ]}>
-                                  {sub.name}
-                                </Text>
-                              </TouchableOpacity>
-                            ))
-                          )}
-                        </ScrollView>
+                        <Ionicons name="folder" size={20} color="#6c5ce7" />
+                        <Text style={styles.categoryPickerText}>{productCategory}</Text>
+                      </>
+                    ) : (
+                      <>
+                        <Ionicons name="folder-outline" size={20} color="#666" />
+                        <Text style={styles.categoryPickerPlaceholder}>Select Category</Text>
                       </>
                     )}
                   </View>
-                ) : (
+                  <Ionicons name="chevron-forward" size={20} color="#666" />
+                </TouchableOpacity>
+              </View>
                   <TextInput
                     style={styles.input}
                     value={productCategory}
