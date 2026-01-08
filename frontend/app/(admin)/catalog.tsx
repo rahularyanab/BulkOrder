@@ -192,8 +192,8 @@ export default function CatalogManagementScreen() {
   };
 
   const handleAddProduct = async () => {
-    if (!productName || !productBrand || !productUnit || !productCategory) {
-      Alert.alert('Error', 'Please fill in all required fields');
+    if (!productName || !productUnit || !productCategory) {
+      Alert.alert('Error', 'Please fill in Product Name, Category, and Unit');
       return;
     }
 
@@ -201,7 +201,7 @@ export default function CatalogManagementScreen() {
     try {
       await api.createProduct({
         name: productName,
-        brand: productBrand,
+        brand: productBrand || undefined,
         barcode: productBarcode || undefined,
         unit: productUnit,
         category: productCategory,
