@@ -164,7 +164,7 @@ class ProductUpdate(BaseModel):
 class Product(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
-    brand: str
+    brand: Optional[str] = None
     barcode: Optional[str] = None
     unit: str
     category: Optional[str] = None  # Backward compatible - category name
