@@ -1082,8 +1082,8 @@ export default function CatalogManagementScreen() {
         animationType="slide"
         onRequestClose={() => setCategoryPickerVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { maxHeight: '80%', paddingBottom: insets.bottom + 24 }]}>
+        <View style={styles.categoryPickerOverlay}>
+          <View style={[styles.categoryPickerModal, { paddingBottom: insets.bottom + 24 }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Select Category</Text>
               <TouchableOpacity onPress={() => {
@@ -1094,7 +1094,12 @@ export default function CatalogManagementScreen() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.categoryPickerList} showsVerticalScrollIndicator={false}>
+            <ScrollView 
+              style={styles.categoryPickerList} 
+              contentContainerStyle={styles.categoryPickerListContent}
+              showsVerticalScrollIndicator={true}
+              bounces={true}
+            >
               {categories.length === 0 ? (
                 <View style={styles.emptyState}>
                   <Ionicons name="folder-open-outline" size={48} color="#666" />
@@ -1126,7 +1131,7 @@ export default function CatalogManagementScreen() {
                         <View style={[styles.categoryPickerIcon, { backgroundColor: 'rgba(108, 92, 231, 0.2)' }]}>
                           <Ionicons name="folder" size={20} color="#6c5ce7" />
                         </View>
-                        <View>
+                        <View style={styles.categoryPickerItemTextContainer}>
                           <Text style={styles.categoryPickerItemName}>{cat.name}</Text>
                           {cat.subcategories && cat.subcategories.length > 0 && (
                             <Text style={styles.categoryPickerItemCount}>
