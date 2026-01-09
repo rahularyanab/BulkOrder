@@ -1,0 +1,49 @@
+# EAS Build Ignore File
+# Ignore system and unnecessary files
+
+# System files
+.Trash
+.DS_Store
+*.log
+
+# Node modules (EAS will install fresh)
+node_modules/
+
+# Git
+.git/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Build artifacts
+dist/
+build/
+.expo/
+*.tsbuildinfo
+
+# Environment files (use EAS secrets instead)
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Test files
+__tests__/
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+coverage/
+
+# Documentation
+*.md
+!README.md
+
+# Misc
+*.tar.gz
+*.zip
+.cache/
+tmp/
