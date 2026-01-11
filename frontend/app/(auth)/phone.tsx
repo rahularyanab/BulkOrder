@@ -40,9 +40,15 @@ export default function PhoneScreen() {
       if (response.success) {
         // Navigate to OTP screen
         router.push({ pathname: '/(auth)/otp', params: { phone: cleanPhone } });
+      } else {
+        Alert.alert('Error', response.message || 'Failed to send OTP');
       }
     } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.detail || 'Failed to send OTP');
+      console.error('OTP Error:', error);
+      const errorMessage = error.response?.data?.detail || 
+                          error.message || 
+                          'Network error. Please check your connection.';
+      Alert.alert('Error', errorMessage);
     } finally {
       setIsLoading(false);
     }
