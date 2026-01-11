@@ -426,48 +426,32 @@ async def send_sms_via_msg91(phone: str, otp: str) -> dict:
         formatted_phone = phone[1:]  # Remove + sign
     
     try:
-        # MSG91 Send OTP API
+        # MSG91 Send OTP API with template_id
         url = "https://control.msg91.com/api/v5/otp"
         
         params = {
-            "template_id": template_id,
-            "mobile": formatted_phone,
             "authkey": auth_key,
-            "otp": otp  # Send our generated OTP
+            "mobile": formatted_phone,
+            "otp": otp,
+            "sender": sender_id,
         }
         
-        # If no template_id, use flow API instead
-        if not template_id:
-            # Use simple SMS API as fallback
-            url = "https://control.msg91.com/api/v5/flow/"
-            payload = {
-                "flow_id": "",  # Will use default
-                "sender": sender_id,
-                "mobiles": formatted_phone,
-                "VAR1": otp
-            }
-            # Try the basic OTP endpoint without template
-            url = f"https://api.msg91.com/api/v5/otp?authkey={auth_key}&mobile={formatted_phone}&otp={otp}&sender={sender_id}"
+        # Add template_id if available (required for DLT compliance in India)
+        if template_id:
+            params["template_id"] = template_id
+            logger.info(f"Using DLT template: {template_id}")
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, params=params, timeout=10.0)
+            result = response.json()
+            logger.info(f"MSG91 Response: {result}")
             
-            async with httpx.AsyncClient() as client:
-                response = await client.get(url, timeout=10.0)
-                result = response.json()
-                logger.info(f"MSG91 Response: {result}")
-                
-                if result.get("type") == "success" or response.status_code == 200:
-                    return {"success": True, "message": "OTP sent via SMS"}
-                else:
-                    return {"success": False, "error": result.get("message", "SMS sending failed")}
-        else:
-            async with httpx.AsyncClient() as client:
-                response = await client.get(url, params=params, timeout=10.0)
-                result = response.json()
-                logger.info(f"MSG91 Response: {result}")
-                
-                if result.get("type") == "success":
-                    return {"success": True, "message": "OTP sent via SMS"}
-                else:
-                    return {"success": False, "error": result.get("message", "SMS sending failed")}
+            if result.get("type") == "success":
+                return {"success": True, "message": "OTP sent via SMS"}
+            else:
+                error_msg = result.get("message", "SMS sending failed")
+                logger.error(f"MSG91 Error: {error_msg}")
+                return {"success": False, "error": error_msg}
                     
     except Exception as e:
         logger.error(f"MSG91 API error: {str(e)}")
