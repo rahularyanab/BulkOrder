@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "710262795734",
+    "project_id": "saudasetu-4e804",
+    "storage_bucket": "saudasetu-4e804.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:710262795734:android:e4d5d64f266bf740e8c877",
+        "android_client_info": {
+          "package_name": "com.rahul_aryanab.frontend"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyACSSOxF4v2SBs_SxJFzRT-HmfdHGGrrq8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
