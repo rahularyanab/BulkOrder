@@ -14,6 +14,7 @@ import random
 import string
 import jwt
 import math
+import httpx  # For MSG91 API calls
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
