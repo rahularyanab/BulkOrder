@@ -540,11 +540,20 @@ async def create_retailer(retailer_data: RetailerCreate, user=Depends(get_curren
     min_distance = float('inf')
     
     for zone in zones:
+        # Handle both old and new zone data structures
+        zone_center = zone.get("center", {})
+        if isinstance(zone_center, dict):
+            zone_lat = zone_center.get("latitude", 0)
+            zone_lng = zone_center.get("longitude", 0)
+        else:
+            # Skip zones with invalid center data
+            continue
+            
         distance = haversine_distance(
             retailer.location.latitude,
             retailer.location.longitude,
-            zone["center"]["latitude"],
-            zone["center"]["longitude"]
+            zone_lat,
+            zone_lng
         )
         # Check if retailer is within this zone's radius
         if distance <= zone.get("radius_km", 5.0):
