@@ -38,13 +38,8 @@ export default function PhoneScreen() {
     try {
       const response = await api.sendOTP(cleanPhone);
       if (response.success) {
-        // For testing, show OTP in alert
-        Alert.alert('OTP Sent', `Your OTP is: ${response.otp}`, [
-          {
-            text: 'OK',
-            onPress: () => router.push({ pathname: '/(auth)/otp', params: { phone: cleanPhone } }),
-          },
-        ]);
+        // Navigate to OTP screen
+        router.push({ pathname: '/(auth)/otp', params: { phone: cleanPhone } });
       }
     } catch (error: any) {
       Alert.alert('Error', error.response?.data?.detail || 'Failed to send OTP');
