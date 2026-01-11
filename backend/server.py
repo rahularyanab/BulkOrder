@@ -102,6 +102,7 @@ class Zone(BaseModel):
     center: Location
     radius_km: float = 5.0
     retailer_count: int = 0
+    city: Optional[str] = None
     is_active: bool = True
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
