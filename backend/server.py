@@ -378,6 +378,10 @@ def get_price_for_quantity(slabs: List[dict], quantity: int) -> float:
 
 def generate_otp() -> str:
     """Generate 6-digit OTP"""
+    # In mock mode (SMS disabled), use fixed OTP for easy testing
+    sms_enabled = os.environ.get('SMS_ENABLED', 'false').lower() == 'true'
+    if not sms_enabled:
+        return '123456'  # Fixed OTP for testing
     return ''.join(random.choices(string.digits, k=6))
 
 def create_access_token(data: dict, expires_delta: timedelta = None) -> str:
