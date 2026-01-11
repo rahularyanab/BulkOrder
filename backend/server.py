@@ -406,6 +406,73 @@ async def get_admin_user(credentials: HTTPAuthorizationCredentials = Depends(sec
         raise HTTPException(status_code=403, detail="Admin access required")
     return payload
 
+# ===================== MSG91 SMS HELPER =====================
+
+async def send_sms_via_msg91(phone: str, otp: str) -> dict:
+    """Send OTP via MSG91 API"""
+    auth_key = os.environ.get('MSG91_AUTH_KEY', '')
+    sender_id = os.environ.get('MSG91_SENDER_ID', 'GRPBUY')
+    template_id = os.environ.get('MSG91_TEMPLATE_ID', '')
+    
+    if not auth_key:
+        logger.warning("MSG91 auth key not configured")
+        return {"success": False, "error": "SMS service not configured"}
+    
+    # Format phone number (add country code if not present)
+    formatted_phone = phone
+    if not phone.startswith('+') and not phone.startswith('91'):
+        formatted_phone = f"91{phone}"
+    elif phone.startswith('+'):
+        formatted_phone = phone[1:]  # Remove + sign
+    
+    try:
+        # MSG91 Send OTP API
+        url = "https://control.msg91.com/api/v5/otp"
+        
+        params = {
+            "template_id": template_id,
+            "mobile": formatted_phone,
+            "authkey": auth_key,
+            "otp": otp  # Send our generated OTP
+        }
+        
+        # If no template_id, use flow API instead
+        if not template_id:
+            # Use simple SMS API as fallback
+            url = "https://control.msg91.com/api/v5/flow/"
+            payload = {
+                "flow_id": "",  # Will use default
+                "sender": sender_id,
+                "mobiles": formatted_phone,
+                "VAR1": otp
+            }
+            # Try the basic OTP endpoint without template
+            url = f"https://api.msg91.com/api/v5/otp?authkey={auth_key}&mobile={formatted_phone}&otp={otp}&sender={sender_id}"
+            
+            async with httpx.AsyncClient() as client:
+                response = await client.get(url, timeout=10.0)
+                result = response.json()
+                logger.info(f"MSG91 Response: {result}")
+                
+                if result.get("type") == "success" or response.status_code == 200:
+                    return {"success": True, "message": "OTP sent via SMS"}
+                else:
+                    return {"success": False, "error": result.get("message", "SMS sending failed")}
+        else:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(url, params=params, timeout=10.0)
+                result = response.json()
+                logger.info(f"MSG91 Response: {result}")
+                
+                if result.get("type") == "success":
+                    return {"success": True, "message": "OTP sent via SMS"}
+                else:
+                    return {"success": False, "error": result.get("message", "SMS sending failed")}
+                    
+    except Exception as e:
+        logger.error(f"MSG91 API error: {str(e)}")
+        return {"success": False, "error": str(e)}
+
 # ===================== AUTH ENDPOINTS =====================
 
 @api_router.post("/auth/send-otp")
@@ -428,23 +495,36 @@ async def send_otp(request: OTPRequest):
         upsert=True
     )
     
-    # Log OTP (for debugging - remove in production)
-    logger.info(f"OTP for {phone}: {otp}")
+    # Check if SMS is enabled
+    sms_enabled = os.environ.get('SMS_ENABLED', 'false').lower() == 'true'
+    sms_sent = False
+    sms_error = None
     
-    # TODO: Integrate SMS service (MSG91/Twilio) to send OTP
-    # For now, the OTP is stored and can be verified
+    if sms_enabled:
+        # Send OTP via MSG91
+        sms_result = await send_sms_via_msg91(phone, otp)
+        sms_sent = sms_result.get("success", False)
+        if not sms_sent:
+            sms_error = sms_result.get("error", "Unknown error")
+            logger.warning(f"SMS sending failed for {phone}: {sms_error}")
     
-    # Check if in production mode
-    is_production = os.environ.get('PRODUCTION_MODE', 'false').lower() == 'true'
+    # Log OTP (for debugging)
+    if not sms_sent:
+        logger.info(f"OTP for {phone}: {otp} (SMS not sent: {sms_error or 'disabled'})")
+    else:
+        logger.info(f"OTP sent via SMS to {phone}")
     
     response = {
         "success": True,
-        "message": "OTP sent successfully"
+        "message": "OTP sent successfully" if sms_sent else "OTP generated (check logs for testing)"
     }
     
-    # Only include OTP in response for development/testing
-    if not is_production:
+    # Include OTP in response only if SMS was NOT sent (for testing)
+    if not sms_sent:
         response["otp"] = otp
+        response["sms_status"] = "disabled" if not sms_enabled else f"failed: {sms_error}"
+    else:
+        response["sms_status"] = "sent"
     
     return response
 
