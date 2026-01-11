@@ -426,14 +426,25 @@ async def send_otp(request: OTPRequest):
         upsert=True
     )
     
-    # In production, send SMS here. For MVP, log OTP
+    # Log OTP (for debugging - remove in production)
     logger.info(f"OTP for {phone}: {otp}")
     
-    return {
+    # TODO: Integrate SMS service (MSG91/Twilio) to send OTP
+    # For now, the OTP is stored and can be verified
+    
+    # Check if in production mode
+    is_production = os.environ.get('PRODUCTION_MODE', 'false').lower() == 'true'
+    
+    response = {
         "success": True,
-        "message": "OTP sent successfully",
-        "otp": otp  # Remove in production! For testing only
+        "message": "OTP sent successfully"
     }
+    
+    # Only include OTP in response for development/testing
+    if not is_production:
+        response["otp"] = otp
+    
+    return response
 
 @api_router.post("/auth/verify-otp", response_model=TokenResponse)
 async def verify_otp(request: OTPVerify):
