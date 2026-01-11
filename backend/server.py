@@ -535,6 +535,8 @@ async def create_retailer(retailer_data: RetailerCreate, user=Depends(get_curren
     # Find zones within 5km radius
     zones = await db.zones.find({"is_active": True}).to_list(1000)
     applicable_zone_ids = []
+    nearest_zone = None
+    min_distance = float('inf')
     
     for zone in zones:
         distance = haversine_distance(
@@ -543,20 +545,30 @@ async def create_retailer(retailer_data: RetailerCreate, user=Depends(get_curren
             zone["center"]["latitude"],
             zone["center"]["longitude"]
         )
-        if distance <= zone["radius_km"]:
+        # Check if retailer is within this zone's radius
+        if distance <= zone.get("radius_km", 5.0):
             applicable_zone_ids.append(zone["id"])
+        # Track nearest zone for logging
+        if distance < min_distance:
+            min_distance = distance
+            nearest_zone = zone
     
-    # If no zones found, create a new zone centered on retailer
+    # If no zones found within range, create a new zone centered on retailer
     if not applicable_zone_ids:
+        # Generate a zone name based on location or shop name
+        zone_number = await db.zones.count_documents({}) + 1
         new_zone = Zone(
-            name=f"Zone-{retailer.shop_name[:10]}",
+            name=f"Zone {zone_number}",
             center=retailer.location,
-            radius_km=5.0,
-            retailer_count=1
+            radius_km=5.0,  # 5km radius for group buying
+            retailer_count=1,
+            city=retailer_data.address.split(',')[-1].strip() if retailer_data.address else "Unknown"
         )
         await db.zones.insert_one(new_zone.model_dump())
         applicable_zone_ids.append(new_zone.id)
-        logger.info(f"Created new zone: {new_zone.name} for retailer {retailer.shop_name}")
+        logger.info(f"Created new zone: {new_zone.name} (5km radius) for retailer {retailer.shop_name}")
+        if nearest_zone:
+            logger.info(f"Nearest existing zone was {nearest_zone['name']} at {min_distance:.2f}km away")
     else:
         # Update retailer count in applicable zones
         await db.zones.update_many(
