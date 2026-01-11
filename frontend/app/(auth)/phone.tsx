@@ -38,8 +38,17 @@ export default function PhoneScreen() {
     try {
       const response = await api.sendOTP(cleanPhone);
       if (response.success) {
-        // Navigate to OTP screen
-        router.push({ pathname: '/(auth)/otp', params: { phone: cleanPhone } });
+        // Show OTP in alert if in mock mode (for testing)
+        if (response.otp) {
+          Alert.alert(
+            '🔐 Test Mode OTP', 
+            `Your OTP is: ${response.otp}\n\n(SMS disabled - DLT pending)`,
+            [{ text: 'OK', onPress: () => router.push({ pathname: '/(auth)/otp', params: { phone: cleanPhone } }) }]
+          );
+        } else {
+          // SMS was sent, navigate directly
+          router.push({ pathname: '/(auth)/otp', params: { phone: cleanPhone } });
+        }
       } else {
         Alert.alert('Error', response.message || 'Failed to send OTP');
       }
