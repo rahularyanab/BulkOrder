@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "B2B RetailHub",
-    "slug": "b2b-retailhub",
+    "slug": "frontend",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -43,9 +43,9 @@
     },
     "extra": {
       "eas": {
-        "projectId": "b2b-retailhub"
+        "projectId": "1c9a7dd4-b126-4306-90a4-65a7dba4998f"
       }
     },
-    "owner": "b2bretailhub"
+    "owner": "rahul_aryanab"
   }
 }
