@@ -8,6 +8,9 @@
     "scheme": "b2bretailhub",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "cli": {
+        "appVersionSource": "remote"
+    }
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.b2bretailhub.app"
