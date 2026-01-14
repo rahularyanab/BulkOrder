@@ -470,6 +470,81 @@ async def send_sms_via_msg91(phone: str, otp: str) -> dict:
         logger.error(f"MSG91 API error: {str(e)}")
         return {"success": False, "error": str(e)}
 
+# ===================== EXPO PUSH NOTIFICATION HELPER =====================
+
+async def send_push_notification(push_tokens: List[str], title: str, body: str, data: dict = None):
+    """Send push notification via Expo Push API"""
+    if not push_tokens:
+        return {"success": False, "error": "No push tokens provided"}
+    
+    messages = []
+    for token in push_tokens:
+        if not token or not token.startswith("ExponentPushToken"):
+            continue
+        message = {
+            "to": token,
+            "sound": "default",
+            "title": title,
+            "body": body,
+            "data": data or {},
+        }
+        messages.append(message)
+    
+    if not messages:
+        return {"success": False, "error": "No valid push tokens"}
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://exp.host/--/api/v2/push/send",
+                json=messages,
+                headers={
+                    "Accept": "application/json",
+                    "Accept-Encoding": "gzip, deflate",
+                    "Content-Type": "application/json",
+                },
+                timeout=10.0
+            )
+            result = response.json()
+            logger.info(f"Expo Push Response: {result}")
+            return {"success": True, "result": result}
+    except Exception as e:
+        logger.error(f"Expo Push API error: {str(e)}")
+        return {"success": False, "error": str(e)}
+
+async def notify_admins(title: str, body: str, data: dict = None):
+    """Send notification to all admin devices"""
+    # Get all admin push tokens
+    admin_tokens = await db.push_tokens.find({"is_admin": True}).to_list(100)
+    tokens = [t["push_token"] for t in admin_tokens if t.get("push_token")]
+    if tokens:
+        await send_push_notification(tokens, title, body, data)
+
+async def notify_retailer(retailer_id: str, title: str, body: str, data: dict = None):
+    """Send notification to a specific retailer"""
+    # Get retailer's push tokens
+    retailer_tokens = await db.push_tokens.find({"retailer_id": retailer_id}).to_list(10)
+    tokens = [t["push_token"] for t in retailer_tokens if t.get("push_token")]
+    if tokens:
+        await send_push_notification(tokens, title, body, data)
+
+async def notify_zone_retailers(zone_id: str, title: str, body: str, data: dict = None, exclude_retailer_id: str = None):
+    """Send notification to all retailers in a zone"""
+    # Get all retailers in the zone
+    retailers = await db.retailers.find({"zone_ids": zone_id}).to_list(1000)
+    retailer_ids = [r["id"] for r in retailers if r["id"] != exclude_retailer_id]
+    
+    if not retailer_ids:
+        return
+    
+    # Get push tokens for these retailers
+    retailer_tokens = await db.push_tokens.find({
+        "retailer_id": {"$in": retailer_ids}
+    }).to_list(1000)
+    tokens = [t["push_token"] for t in retailer_tokens if t.get("push_token")]
+    if tokens:
+        await send_push_notification(tokens, title, body, data)
+
 # ===================== AUTH ENDPOINTS =====================
 
 @api_router.post("/auth/send-otp")
