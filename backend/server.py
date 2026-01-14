@@ -1815,6 +1815,32 @@ async def update_offer_status(offer_id: str, new_status: str, admin=Depends(get_
     
     logger.info(f"Offer {offer_id} status updated to {new_status}")
     
+    # Get product name for notification
+    product = await db.products.find_one({"id": offer["product_id"]})
+    product_name = product["name"] if product else "your order"
+    
+    # Send notification to all retailers who ordered from this offer
+    orders = await db.order_items.find({"offer_id": offer_id}).to_list(1000)
+    retailer_ids = list(set(o["retailer_id"] for o in orders))
+    
+    # Status-specific notification messages
+    status_messages = {
+        "ready_to_pack": ("📦 Order Ready", f"Your order for {product_name} is ready to be packed!"),
+        "picked_up": ("🚛 Order Picked Up", f"Your order for {product_name} has been picked up for delivery!"),
+        "out_for_delivery": ("🚚 Out for Delivery", f"Your order for {product_name} is out for delivery!"),
+        "delivered": ("✅ Order Delivered", f"Your order for {product_name} has been delivered!")
+    }
+    
+    if new_status in status_messages:
+        title, body = status_messages[new_status]
+        for retailer_id in retailer_ids:
+            await notify_retailer(
+                retailer_id,
+                title=title,
+                body=body,
+                data={"type": "order_status", "offer_id": offer_id, "status": new_status}
+            )
+    
     return {"success": True, "message": f"Offer status updated to {new_status}"}
 
 @api_router.get("/admin/orders")
