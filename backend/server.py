@@ -347,6 +347,15 @@ class DisputeCreate(BaseModel):
     payment_id: str
     reason: str
 
+# ===================== PUSH NOTIFICATION MODELS =====================
+
+class PushTokenRegister(BaseModel):
+    push_token: str
+    is_admin: bool = False
+
+class PushTokenUnregister(BaseModel):
+    push_token: str
+
 # Admin phone numbers (in production, store in DB)
 ADMIN_PHONES = ["9999999999", "8888888888", "1234567890"]
 
