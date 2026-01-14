@@ -9,10 +9,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 
 export default function ProfileScreen() {
   const { retailer, logout } = useAuth();
+  const router = useRouter();
 
   const handleLogout = () => {
     Alert.alert('Logout', 'Are you sure you want to logout?', [
@@ -23,6 +25,10 @@ export default function ProfileScreen() {
         onPress: logout,
       },
     ]);
+  };
+
+  const handleEditProfile = () => {
+    router.push('/(tabs)/edit-profile');
   };
 
   return (
@@ -67,7 +73,7 @@ export default function ProfileScreen() {
               <View style={styles.detailText}>
                 <Text style={styles.detailLabel}>GPS Coordinates</Text>
                 <Text style={styles.detailValue}>
-                  {retailer?.location.latitude.toFixed(6)}, {retailer?.location.longitude.toFixed(6)}
+                  {retailer?.location?.latitude?.toFixed(6)}, {retailer?.location?.longitude?.toFixed(6)}
                 </Text>
               </View>
             </View>
@@ -78,7 +84,7 @@ export default function ProfileScreen() {
               <Ionicons name="map" size={20} color="#6c5ce7" />
               <View style={styles.detailText}>
                 <Text style={styles.detailLabel}>Active Zones</Text>
-                <Text style={styles.detailValue}>{retailer?.zone_ids.length} zone(s)</Text>
+                <Text style={styles.detailValue}>{retailer?.zone_ids?.length || 0} zone(s)</Text>
               </View>
             </View>
           </View>
@@ -88,8 +94,8 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Settings</Text>
           
-          <TouchableOpacity style={styles.menuItem}>
-            <Ionicons name="create" size={20} color="#666" />
+          <TouchableOpacity style={styles.menuItem} onPress={handleEditProfile}>
+            <Ionicons name="create" size={20} color="#6c5ce7" />
             <Text style={styles.menuText}>Edit Profile</Text>
             <Ionicons name="chevron-forward" size={20} color="#666" />
           </TouchableOpacity>
