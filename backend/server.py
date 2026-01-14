@@ -1372,6 +1372,14 @@ async def approve_bid_request(request_id: str, admin=Depends(get_admin_user)):
         {"$set": {"status": "approved"}}
     )
     
+    # Notify retailer about approval
+    await notify_retailer(
+        request["retailer_id"],
+        title="✅ Bid Approved!",
+        body=f"Your bid request for {request.get('product_name', 'product')} has been approved. An offer will be created soon.",
+        data={"type": "bid_approved", "request_id": request_id}
+    )
+    
     return {"success": True, "message": "Bid request approved. Please create an offer for this product."}
 
 @api_router.put("/admin/bid-requests/{request_id}/reject")
@@ -1384,6 +1392,15 @@ async def reject_bid_request(request_id: str, reason: Optional[str] = None, admi
     await db.bid_requests.update_one(
         {"id": request_id},
         {"$set": {"status": "rejected", "notes": reason or request.get("notes")}}
+    )
+    
+    # Notify retailer about rejection
+    rejection_msg = f"Reason: {reason}" if reason else "Contact admin for details."
+    await notify_retailer(
+        request["retailer_id"],
+        title="❌ Bid Rejected",
+        body=f"Your bid request for {request.get('product_name', 'product')} was rejected. {rejection_msg}",
+        data={"type": "bid_rejected", "request_id": request_id}
     )
     
     return {"success": True, "message": "Bid request rejected."}
