@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "B2B RetailHub",
-    "slug": "b2b-retailhub",
+    "name": "saudasetu",
+    "slug": "saudasetu",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -42,10 +42,10 @@
       "typedRoutes": true
     },
     "extra": {
+      "router": {},
       "eas": {
-        "projectId": "b2b-retailhub"
+        "projectId": "3f227e72-ae54-4626-b61f-821e7c083067"
       }
-    },
-    "owner": "b2bretailhub"
+    }
   }
 }
