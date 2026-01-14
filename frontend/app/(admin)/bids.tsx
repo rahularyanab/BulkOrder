@@ -155,7 +155,35 @@ export default function AdminBidsScreen() {
         ]
       );
     } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.detail || 'Failed to create offer');
+      const errorMsg = error.response?.data?.detail || error.message || 'Failed to create offer';
+      
+      // Check if offer already exists - provide more helpful message
+      if (errorMsg.includes('already exists')) {
+        Alert.alert(
+          'Offer Already Exists', 
+          'An active offer already exists for this product in this zone. Would you like to just approve the bid request without creating a new offer?',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { 
+              text: 'Approve Only', 
+              onPress: async () => {
+                try {
+                  await api.approveBidRequest(selectedBid.id);
+                  Alert.alert('Success', 'Bid request approved!');
+                  setCreateOfferModalVisible(false);
+                  setDetailModalVisible(false);
+                  resetOfferForm();
+                  fetchData();
+                } catch (e: any) {
+                  Alert.alert('Error', e.response?.data?.detail || 'Failed to approve bid');
+                }
+              }
+            }
+          ]
+        );
+      } else {
+        Alert.alert('Error', errorMsg);
+      }
     } finally {
       setActionLoading(false);
     }
