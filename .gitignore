@@ -16,6 +16,11 @@ node_modules/
 !.yarn/releases
 !.yarn/versions
 
+# local env files
+.env
+.env.*
+.env*.local
+
 # Testing
 /coverage
 

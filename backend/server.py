@@ -1,3 +1,6 @@
+from dotenv import load_dotenv
+load_dotenv()
+
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
@@ -31,6 +34,10 @@ ACCESS_TOKEN_EXPIRE_HOURS = 24 * 7  # 7 days
 
 # Create the main app
 app = FastAPI(title="GroupBuy Retail API")
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
