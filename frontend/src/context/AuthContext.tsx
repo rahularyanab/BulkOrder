@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../services/api';
+import { notificationService } from '../services/notifications';
 import { useRouter } from 'expo-router';
 
 interface Location {
@@ -50,6 +51,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     loadStoredAuth();
   }, []);
+
+  // Register push token when auth state changes
+  useEffect(() => {
+    if (token && phone) {
+      // Small delay to ensure API is set up
+      setTimeout(() => {
+        notificationService.savePushToken(ADMIN_PHONES.includes(phone));
+      }, 1000);
+    }
+  }, [token, phone]);
 
   const loadStoredAuth = async () => {
     try {
@@ -101,6 +112,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const retailerData = await api.getCurrentRetailer();
         setRetailerState(retailerData);
       }
+
+      // Register push token after successful login
+      notificationService.savePushToken(ADMIN_PHONES.includes(userPhone));
     } catch (error) {
       console.error('Error during login:', error);
       throw error;
