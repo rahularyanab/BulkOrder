@@ -667,6 +667,49 @@ async def admin_password_login(phone: str, password: str):
     }
 
 
+# ===================== PUSH NOTIFICATION ENDPOINTS =====================
+
+@api_router.post("/notifications/register")
+async def register_push_token(data: PushTokenRegister, user=Depends(get_current_user)):
+    """Register a push notification token for the current user"""
+    phone = user.get("sub")
+    is_admin = user.get("is_admin", False) or data.is_admin
+    
+    # Get retailer_id if not admin
+    retailer_id = None
+    if not is_admin:
+        retailer = await db.retailers.find_one({"phone": phone})
+        if retailer:
+            retailer_id = retailer["id"]
+    
+    # Upsert push token
+    await db.push_tokens.update_one(
+        {"push_token": data.push_token},
+        {
+            "$set": {
+                "push_token": data.push_token,
+                "phone": phone,
+                "retailer_id": retailer_id,
+                "is_admin": is_admin,
+                "updated_at": datetime.utcnow()
+            },
+            "$setOnInsert": {
+                "created_at": datetime.utcnow()
+            }
+        },
+        upsert=True
+    )
+    
+    logger.info(f"Push token registered for {'admin' if is_admin else 'retailer'}: {phone}")
+    return {"success": True, "message": "Push token registered"}
+
+@api_router.post("/notifications/unregister")
+async def unregister_push_token(data: PushTokenUnregister, user=Depends(get_current_user)):
+    """Remove a push notification token"""
+    await db.push_tokens.delete_one({"push_token": data.push_token})
+    return {"success": True, "message": "Push token removed"}
+
+
 # ===================== RETAILER ENDPOINTS =====================
 
 @api_router.post("/retailers", response_model=Retailer)
