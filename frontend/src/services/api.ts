@@ -297,6 +297,20 @@ class ApiService {
     const response = await this.client.get('/health');
     return response.data;
   }
+
+  // Push Notifications
+  async savePushToken(token: string, isAdmin: boolean = false) {
+    const response = await this.client.post('/notifications/register', { 
+      push_token: token,
+      is_admin: isAdmin 
+    });
+    return response.data;
+  }
+
+  async removePushToken(token: string) {
+    const response = await this.client.post('/notifications/unregister', { push_token: token });
+    return response.data;
+  }
 }
 
 export const api = new ApiService();
