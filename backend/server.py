@@ -1158,6 +1158,29 @@ async def create_order(order_data: OrderItemCreate, user=Depends(get_current_use
     
     logger.info(f"Order created by {retailer['shop_name']}: {order_data.quantity} {product['unit']} of {product['name']} at ₹{price_per_unit}/{product['unit']}")
     
+    # Notify admins about new order
+    await notify_admins(
+        title="🛒 New Order Placed",
+        body=f"{retailer['shop_name']} ordered {order_data.quantity} {product['unit']} of {product['name']}",
+        data={"type": "new_order", "order_id": order_item.id, "offer_id": order_data.offer_id}
+    )
+    
+    # If price dropped due to higher quantity, notify other retailers in zone
+    old_price = get_price_for_quantity(offer["quantity_slabs"], offer["current_aggregated_qty"])
+    if price_per_unit < old_price and len(all_orders) > 1:
+        # Get zone name
+        zone = await db.zones.find_one({"id": offer["zone_id"]})
+        zone_name = zone["name"] if zone else "your zone"
+        
+        # Notify other retailers about price drop
+        await notify_zone_retailers(
+            offer["zone_id"],
+            title="💰 Price Dropped!",
+            body=f"{product['name']} price dropped to ₹{price_per_unit}/{product['unit']}! More retailers joined.",
+            data={"type": "price_drop", "offer_id": order_data.offer_id},
+            exclude_retailer_id=retailer["id"]
+        )
+    
     return {
         "success": True,
         "order_id": order_item.id,
