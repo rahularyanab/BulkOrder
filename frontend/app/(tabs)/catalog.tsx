@@ -182,7 +182,14 @@ export default function CatalogScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([fetchOffers(), fetchProducts()]);
+    if (selectedZone) {
+      await Promise.all([
+        fetchOffersForZone(selectedZone.id),
+        fetchProducts()
+      ]);
+    }
+    setRefreshing(false);
+  };
     setRefreshing(false);
   };
 
