@@ -291,7 +291,9 @@ export default function CatalogScreen() {
               onPress: () => {
                 setOfferModalVisible(false);
                 setOrderQuantity('');
-                fetchOffers();
+                if (selectedZone) {
+                  fetchOffersForZone(selectedZone.id);
+                }
               },
             },
           ]
