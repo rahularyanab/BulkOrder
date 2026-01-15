@@ -190,8 +190,6 @@ export default function CatalogScreen() {
     }
     setRefreshing(false);
   };
-    setRefreshing(false);
-  };
 
   const getSupplierColor = (code: string) => {
     switch (code) {
