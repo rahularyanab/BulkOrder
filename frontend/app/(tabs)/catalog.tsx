@@ -190,6 +190,8 @@ export default function CatalogScreen() {
     }
     setRefreshing(false);
   };
+    setRefreshing(false);
+  };
 
   const getSupplierColor = (code: string) => {
     switch (code) {
@@ -291,9 +293,7 @@ export default function CatalogScreen() {
               onPress: () => {
                 setOfferModalVisible(false);
                 setOrderQuantity('');
-                if (selectedZone) {
-                  fetchOffersForZone(selectedZone.id);
-                }
+                fetchOffers();
               },
             },
           ]
