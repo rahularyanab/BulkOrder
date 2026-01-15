@@ -101,36 +101,46 @@ export default function CatalogScreen() {
     useCallback(() => {
       // Reset and refetch when screen gains focus
       setLoading(true);
-      fetchZones();
+      loadData();
     }, [])
   );
 
-  useEffect(() => {
-    if (selectedZone) {
-      fetchOffers();
-      fetchProducts();
-    }
-  }, [selectedZone]);
-
-  const fetchZones = async () => {
+  const loadData = async () => {
     try {
-      const data = await api.getRetailerZones();
-      setZones(data);
-      if (data.length > 0) {
-        // Always set the first zone (or keep current if still valid)
-        const currentZoneStillValid = selectedZone && data.some((z: Zone) => z.id === selectedZone.id);
+      // Fetch zones first
+      const zonesData = await api.getRetailerZones();
+      setZones(zonesData);
+      
+      if (zonesData.length > 0) {
+        // Determine which zone to use
+        const currentZoneStillValid = selectedZone && zonesData.some((z: Zone) => z.id === selectedZone.id);
+        const zoneToUse = currentZoneStillValid ? selectedZone : zonesData[0];
+        
         if (!currentZoneStillValid) {
-          setSelectedZone(data[0]);
-        } else {
-          // Refresh offers for current zone
-          fetchOffers();
+          setSelectedZone(zoneToUse);
         }
+        
+        // Fetch offers for the zone
+        const offersData = await api.getZoneOffers(zoneToUse.id);
+        setOffers(offersData);
+        
+        // Extract unique categories
+        const categorySet = new Set<string>();
+        offersData.forEach((o: SupplierOffer) => {
+          if (o.product_category) categorySet.add(o.product_category);
+        });
+        setCategories(Array.from(categorySet));
+        
+        // Fetch products
+        const productsData = await api.getProducts();
+        setProducts(productsData);
       } else {
         setSelectedZone(null);
         setOffers([]);
+        setProducts([]);
       }
     } catch (error) {
-      console.error('Failed to fetch zones:', error);
+      console.error('Failed to load data:', error);
       setZones([]);
       setOffers([]);
     } finally {
@@ -138,11 +148,16 @@ export default function CatalogScreen() {
     }
   };
 
-  const fetchOffers = async () => {
-    if (!selectedZone) return;
-    
+  // Also refetch when zone changes manually
+  useEffect(() => {
+    if (selectedZone && !loading) {
+      fetchOffersForZone(selectedZone.id);
+    }
+  }, [selectedZone?.id]);
+
+  const fetchOffersForZone = async (zoneId: string) => {
     try {
-      const data = await api.getZoneOffers(selectedZone.id);
+      const data = await api.getZoneOffers(zoneId);
       setOffers(data);
       
       // Extract unique categories
