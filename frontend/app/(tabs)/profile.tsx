@@ -28,7 +28,7 @@ export default function ProfileScreen() {
   };
 
   const handleEditProfile = () => {
-    router.push('/(tabs)/edit-profile');
+    router.push('/edit-profile');
   };
 
   return (
