@@ -99,6 +99,8 @@ export default function CatalogScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      // Reset and refetch when screen gains focus
+      setLoading(true);
       fetchZones();
     }, [])
   );
@@ -114,11 +116,23 @@ export default function CatalogScreen() {
     try {
       const data = await api.getRetailerZones();
       setZones(data);
-      if (data.length > 0 && !selectedZone) {
-        setSelectedZone(data[0]);
+      if (data.length > 0) {
+        // Always set the first zone (or keep current if still valid)
+        const currentZoneStillValid = selectedZone && data.some((z: Zone) => z.id === selectedZone.id);
+        if (!currentZoneStillValid) {
+          setSelectedZone(data[0]);
+        } else {
+          // Refresh offers for current zone
+          fetchOffers();
+        }
+      } else {
+        setSelectedZone(null);
+        setOffers([]);
       }
     } catch (error) {
       console.error('Failed to fetch zones:', error);
+      setZones([]);
+      setOffers([]);
     } finally {
       setLoading(false);
     }
