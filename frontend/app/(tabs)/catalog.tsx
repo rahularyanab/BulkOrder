@@ -487,31 +487,33 @@ export default function CatalogScreen() {
     );
   };
 
-  const renderProductCard = (product: Product) => (
-    <View key={product.id} style={styles.productCard}>
-      <View style={styles.productCardHeader}>
-        {product.images && product.images.length > 0 ? (
-          <Image source={{ uri: product.images[0] }} style={styles.productImage} />
-        ) : (
-          <View style={styles.productIcon}>
-            <Ionicons name="cube" size={24} color="#6c5ce7" />
+  const renderProductCard = (product: Product) => {
+    return (
+      <View key={product.id} style={styles.productCard}>
+        <View style={styles.productCardHeader}>
+          {product.images && product.images.length > 0 ? (
+            <Image source={{ uri: product.images[0] }} style={styles.productImage} />
+          ) : (
+            <View style={styles.productIcon}>
+              <Ionicons name="cube" size={24} color="#6c5ce7" />
+            </View>
+          )}
+          <View style={styles.productCardInfo}>
+            <Text style={styles.productName}>{product.name}</Text>
+            <Text style={styles.productBrand}>{product.brand} • {product.category_name || product.category}</Text>
+            <Text style={styles.productUnit}>Unit: {product.unit}</Text>
           </View>
-        )}
-        <View style={styles.productCardInfo}>
-          <Text style={styles.productName}>{product.name}</Text>
-          <Text style={styles.productBrand}>{product.brand} • {product.category_name || product.category}</Text>
-          <Text style={styles.productUnit}>Unit: {product.unit}</Text>
         </View>
+        <TouchableOpacity
+          style={styles.requestBidButton}
+          onPress={() => openBidModal(product)}
+        >
+          <Ionicons name="hand-left" size={16} color="#fff" />
+          <Text style={styles.requestBidText}>Request Bid</Text>
+        </TouchableOpacity>
       </View>
-      <TouchableOpacity
-        style={styles.requestBidButton}
-        onPress={() => openBidModal(product)}
-      >
-        <Ionicons name="hand-left" size={16} color="#fff" />
-        <Text style={styles.requestBidText}>Request Bid</Text>
-      </TouchableOpacity>
-    </View>
-  );
+    );
+  };
 
   if (loading) {
     return (
