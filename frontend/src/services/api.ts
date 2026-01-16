@@ -1,12 +1,17 @@
 import axios, { AxiosInstance } from 'axios';
+import Constants from 'expo-constants';
 
-const BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+// Get backend URL from app.json extra config or environment variable
+const BASE_URL = Constants.expoConfig?.extra?.backendUrl || 
+                 process.env.EXPO_PUBLIC_BACKEND_URL || 
+                 'https://saudasetu-api.fly.dev';
 
 class ApiService {
   private client: AxiosInstance;
   private token: string | null = null;
 
   constructor() {
+    console.log('API Base URL:', BASE_URL);
     this.client = axios.create({
       baseURL: `${BASE_URL}/api`,
       timeout: 30000,
