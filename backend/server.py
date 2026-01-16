@@ -1843,7 +1843,7 @@ async def update_offer_status(offer_id: str, new_status: str, admin=Depends(get_
     product = await db.products.find_one({"id": offer["product_id"]})
     product_name = product["name"] if product else "your order"
     
-    # Send notification to all retailers who ordered from this offer
+    # Send notification to all retailers who ordered from this offer (non-blocking)
     orders = await db.order_items.find({"offer_id": offer_id}).to_list(1000)
     retailer_ids = list(set(o["retailer_id"] for o in orders))
     
@@ -1858,12 +1858,15 @@ async def update_offer_status(offer_id: str, new_status: str, admin=Depends(get_
     if new_status in status_messages:
         title, body = status_messages[new_status]
         for retailer_id in retailer_ids:
-            await notify_retailer(
-                retailer_id,
-                title=title,
-                body=body,
-                data={"type": "order_status", "offer_id": offer_id, "status": new_status}
-            )
+            try:
+                await notify_retailer(
+                    retailer_id,
+                    title=title,
+                    body=body,
+                    data={"type": "order_status", "offer_id": offer_id, "status": new_status}
+                )
+            except Exception as e:
+                logger.warning(f"Failed to send status notification to retailer {retailer_id}: {e}")
     
     return {"success": True, "message": f"Offer status updated to {new_status}"}
 
