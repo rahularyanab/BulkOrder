@@ -1395,13 +1395,16 @@ async def approve_bid_request(request_id: str, admin=Depends(get_admin_user)):
         {"$set": {"status": "approved"}}
     )
     
-    # Notify retailer about approval
-    await notify_retailer(
-        request["retailer_id"],
-        title="✅ Bid Approved!",
-        body=f"Your bid request for {request.get('product_name', 'product')} has been approved. An offer will be created soon.",
-        data={"type": "bid_approved", "request_id": request_id}
-    )
+    # Notify retailer about approval (non-blocking, ignore errors)
+    try:
+        await notify_retailer(
+            request["retailer_id"],
+            title="✅ Bid Approved!",
+            body=f"Your bid request for {request.get('product_name', 'product')} has been approved. An offer will be created soon.",
+            data={"type": "bid_approved", "request_id": request_id}
+        )
+    except Exception as e:
+        logger.warning(f"Failed to send approval notification: {e}")
     
     return {"success": True, "message": "Bid request approved. Please create an offer for this product."}
 
