@@ -1534,14 +1534,17 @@ async def create_supplier_offer(offer_data: SupplierOfferCreate):
     offer = SupplierOffer(**offer_data.model_dump())
     await db.supplier_offers.insert_one(offer.model_dump())
     
-    # Notify all retailers in the zone about new offer
-    starting_price = offer_data.quantity_slabs[0]["price"] if offer_data.quantity_slabs else 0
-    await notify_zone_retailers(
-        offer_data.zone_id,
-        title="🎉 New Offer Available!",
-        body=f"New offer on {product['name']} starting at ₹{starting_price}/{product['unit']}. Order now to get group discounts!",
-        data={"type": "new_offer", "offer_id": offer.id, "product_id": product["id"]}
-    )
+    # Notify all retailers in the zone about new offer (non-blocking)
+    try:
+        starting_price = offer_data.quantity_slabs[0]["price"] if offer_data.quantity_slabs else 0
+        await notify_zone_retailers(
+            offer_data.zone_id,
+            title="🎉 New Offer Available!",
+            body=f"New offer on {product['name']} starting at ₹{starting_price}/{product['unit']}. Order now to get group discounts!",
+            data={"type": "new_offer", "offer_id": offer.id, "product_id": product["id"]}
+        )
+    except Exception as e:
+        logger.warning(f"Failed to send new offer notification: {e}")
     
     return offer
 
