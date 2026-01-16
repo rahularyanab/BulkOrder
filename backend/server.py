@@ -981,9 +981,19 @@ async def get_catalog_data(user=Depends(get_current_user)):
         zones_cursor = db.zones.find({"id": {"$in": zone_ids}, "is_active": True})
         zones = [{k: v for k, v in z.items() if k != "_id"} async for z in zones_cursor]
     
-    # Get products
+    # Pre-fetch all products, suppliers, and categories in bulk (faster)
     products_cursor = db.products.find({"is_active": True})
-    products = [{k: v for k, v in p.items() if k != "_id"} async for p in products_cursor]
+    products_list = await products_cursor.to_list(500)
+    products = [{k: v for k, v in p.items() if k != "_id"} for p in products_list]
+    products_map = {p["id"]: p for p in products_list}
+    
+    suppliers_cursor = db.suppliers.find({"is_active": True})
+    suppliers_list = await suppliers_cursor.to_list(100)
+    suppliers_map = {s["id"]: s for s in suppliers_list}
+    
+    categories_cursor = db.categories.find({})
+    categories_list = await categories_cursor.to_list(100)
+    categories_map = {c["id"]: c for c in categories_list}
     
     # Get offers for first zone (if exists)
     offers = []
@@ -991,7 +1001,7 @@ async def get_catalog_data(user=Depends(get_current_user)):
         first_zone_id = zones[0]["id"]
         zone = zones[0]
         
-        # Fetch offers with all details
+        # Fetch offers
         offers_cursor = db.supplier_offers.find({
             "zone_id": first_zone_id,
             "is_active": True,
@@ -1001,17 +1011,17 @@ async def get_catalog_data(user=Depends(get_current_user)):
         raw_offers = await offers_cursor.to_list(100)
         
         for offer in raw_offers:
-            product = await db.products.find_one({"id": offer["product_id"]})
-            supplier = await db.suppliers.find_one({"id": offer["supplier_id"]})
+            product = products_map.get(offer["product_id"])
+            supplier = suppliers_map.get(offer["supplier_id"])
             
             if not product or not supplier:
                 continue
             
             category_name = product.get("category", "Uncategorized")
             if product.get("category_id"):
-                category = await db.categories.find_one({"id": product.get("category_id")})
+                category = categories_map.get(product.get("category_id"))
                 if category:
-                    category_name = category["name"]
+                    category_name = category.get("name", category_name)
             
             offers.append({
                 "id": offer["id"],
@@ -1023,7 +1033,7 @@ async def get_catalog_data(user=Depends(get_current_user)):
                 "product_images": product.get("images", []),
                 "supplier_id": offer["supplier_id"],
                 "supplier_name": supplier["name"],
-                "supplier_code": supplier["code"],
+                "supplier_code": supplier.get("code", ""),
                 "zone_id": offer["zone_id"],
                 "zone_name": zone["name"],
                 "quantity_slabs": offer["quantity_slabs"],
