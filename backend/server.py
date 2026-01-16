@@ -965,6 +965,83 @@ async def get_product(product_id: str):
 
 # ===================== SUPPLIER OFFER ENDPOINTS =====================
 
+@api_router.get("/catalog/data")
+async def get_catalog_data(user=Depends(get_current_user)):
+    """Get all catalog data in a single request for faster loading"""
+    phone = user.get("sub")
+    retailer = await db.retailers.find_one({"phone": phone})
+    
+    if not retailer:
+        return {"zones": [], "offers": [], "products": []}
+    
+    # Get zones for retailer
+    zone_ids = retailer.get("zone_ids", [])
+    zones = []
+    if zone_ids:
+        zones_cursor = db.zones.find({"id": {"$in": zone_ids}, "is_active": True})
+        zones = [{k: v for k, v in z.items() if k != "_id"} async for z in zones_cursor]
+    
+    # Get products
+    products_cursor = db.products.find({"is_active": True})
+    products = [{k: v for k, v in p.items() if k != "_id"} async for p in products_cursor]
+    
+    # Get offers for first zone (if exists)
+    offers = []
+    if zones:
+        first_zone_id = zones[0]["id"]
+        zone = zones[0]
+        
+        # Fetch offers with all details
+        offers_cursor = db.supplier_offers.find({
+            "zone_id": first_zone_id,
+            "is_active": True,
+            "status": {"$in": ["open", "ready_to_pack"]}
+        })
+        
+        raw_offers = await offers_cursor.to_list(100)
+        
+        for offer in raw_offers:
+            product = await db.products.find_one({"id": offer["product_id"]})
+            supplier = await db.suppliers.find_one({"id": offer["supplier_id"]})
+            
+            if not product or not supplier:
+                continue
+            
+            category_name = product.get("category", "Uncategorized")
+            if product.get("category_id"):
+                category = await db.categories.find_one({"id": product.get("category_id")})
+                if category:
+                    category_name = category["name"]
+            
+            offers.append({
+                "id": offer["id"],
+                "product_id": offer["product_id"],
+                "product_name": product["name"],
+                "product_brand": product.get("brand"),
+                "product_unit": product["unit"],
+                "product_category": category_name,
+                "product_images": product.get("images", []),
+                "supplier_id": offer["supplier_id"],
+                "supplier_name": supplier["name"],
+                "supplier_code": supplier["code"],
+                "zone_id": offer["zone_id"],
+                "zone_name": zone["name"],
+                "quantity_slabs": offer["quantity_slabs"],
+                "min_fulfillment_qty": offer["min_fulfillment_qty"],
+                "current_aggregated_qty": offer.get("current_aggregated_qty", 0),
+                "status": offer["status"],
+                "lead_time_days": offer.get("lead_time_days", 3),
+                "valid_until": offer.get("valid_until"),
+                "is_active": offer["is_active"],
+                "created_at": offer.get("created_at"),
+            })
+    
+    return {
+        "zones": zones,
+        "offers": offers,
+        "products": products
+    }
+
 @api_router.get("/offers/zone/{zone_id}")
 async def get_zone_offers(zone_id: str, user=Depends(get_current_user), active_only: bool = False, search: Optional[str] = None):
     """Get all active offers for a specific zone with full details"""
