@@ -1350,12 +1350,15 @@ async def create_bid_request(request_data: BidRequestCreate, user=Depends(get_cu
     
     logger.info(f"Bid request created by {retailer['shop_name']} for {product['name']} in {zone['name']}")
     
-    # Notify admins about new bid request
-    await notify_admins(
-        title="📥 New Bid Request",
-        body=f"{retailer['shop_name']} requested {request_data.requested_quantity} units of {product['name']}",
-        data={"type": "bid_request", "request_id": bid_request.id}
-    )
+    # Notify admins about new bid request (non-blocking)
+    try:
+        await notify_admins(
+            title="📥 New Bid Request",
+            body=f"{retailer['shop_name']} requested {request_data.requested_quantity} units of {product['name']}",
+            data={"type": "bid_request", "request_id": bid_request.id}
+        )
+    except Exception as e:
+        logger.warning(f"Failed to send bid request notification: {e}")
     
     return {
         "success": True,
