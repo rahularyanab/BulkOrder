@@ -45,7 +45,8 @@
       "router": {},
       "eas": {
         "projectId": "3f227e72-ae54-4626-b61f-821e7c083067"
-      }
+      },
+      "backendUrl": "https://saudasetu-api.fly.dev"
     }
   }
 }
