@@ -87,6 +87,12 @@ class ApiService {
     return response.data;
   }
 
+  // Combined catalog data endpoint (faster loading)
+  async getCatalogData() {
+    const response = await this.client.get('/catalog/data');
+    return response.data;
+  }
+
   // Supplier endpoints
   async getSuppliers() {
     const response = await this.client.get('/suppliers');
