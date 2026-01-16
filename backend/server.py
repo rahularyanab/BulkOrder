@@ -1420,14 +1420,17 @@ async def reject_bid_request(request_id: str, reason: Optional[str] = None, admi
         {"$set": {"status": "rejected", "notes": reason or request.get("notes")}}
     )
     
-    # Notify retailer about rejection
-    rejection_msg = f"Reason: {reason}" if reason else "Contact admin for details."
-    await notify_retailer(
-        request["retailer_id"],
-        title="❌ Bid Rejected",
-        body=f"Your bid request for {request.get('product_name', 'product')} was rejected. {rejection_msg}",
-        data={"type": "bid_rejected", "request_id": request_id}
-    )
+    # Notify retailer about rejection (non-blocking, ignore errors)
+    try:
+        rejection_msg = f"Reason: {reason}" if reason else "Contact admin for details."
+        await notify_retailer(
+            request["retailer_id"],
+            title="❌ Bid Rejected",
+            body=f"Your bid request for {request.get('product_name', 'product')} was rejected. {rejection_msg}",
+            data={"type": "bid_rejected", "request_id": request_id}
+        )
+    except Exception as e:
+        logger.warning(f"Failed to send rejection notification: {e}")
     
     return {"success": True, "message": "Bid request rejected."}
 
