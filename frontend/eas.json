@@ -17,7 +17,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_BACKEND_URL": "https://bulkorder.preview.emergentagent.com"
+        "EXPO_PUBLIC_BACKEND_URL": "https://saudasetu-api.fly.dev/"
       }
     },
     "production": {
