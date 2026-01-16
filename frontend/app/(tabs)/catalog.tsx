@@ -107,42 +107,51 @@ export default function CatalogScreen() {
 
   const loadData = async () => {
     try {
-      // Fetch zones and products in parallel (products don't depend on zone)
-      const [zonesData, productsData] = await Promise.all([
-        api.getRetailerZones(),
-        api.getProducts()
-      ]);
+      // Use combined endpoint for faster loading (single API call)
+      const catalogData = await api.getCatalogData();
       
-      setZones(zonesData);
-      setProducts(productsData);
+      setZones(catalogData.zones || []);
+      setProducts(catalogData.products || []);
+      setOffers(catalogData.offers || []);
       
-      if (zonesData.length > 0) {
+      if (catalogData.zones?.length > 0) {
         // Determine which zone to use
-        const currentZoneStillValid = selectedZone && zonesData.some((z: Zone) => z.id === selectedZone.id);
-        const zoneToUse = currentZoneStillValid ? selectedZone : zonesData[0];
-        
+        const currentZoneStillValid = selectedZone && catalogData.zones.some((z: Zone) => z.id === selectedZone.id);
         if (!currentZoneStillValid) {
-          setSelectedZone(zoneToUse);
+          setSelectedZone(catalogData.zones[0]);
         }
-        
-        // Fetch offers for the zone
-        const offersData = await api.getZoneOffers(zoneToUse.id);
-        setOffers(offersData);
         
         // Extract unique categories from offers
         const categorySet = new Set<string>();
-        offersData.forEach((o: SupplierOffer) => {
+        (catalogData.offers || []).forEach((o: SupplierOffer) => {
           if (o.product_category) categorySet.add(o.product_category);
         });
         setCategories(Array.from(categorySet));
       } else {
         setSelectedZone(null);
-        setOffers([]);
       }
     } catch (error) {
       console.error('Failed to load data:', error);
-      setZones([]);
-      setOffers([]);
+      // Fallback to individual calls if combined endpoint fails
+      try {
+        const [zonesData, productsData] = await Promise.all([
+          api.getRetailerZones(),
+          api.getProducts()
+        ]);
+        setZones(zonesData);
+        setProducts(productsData);
+        
+        if (zonesData.length > 0) {
+          const zoneToUse = zonesData[0];
+          setSelectedZone(zoneToUse);
+          const offersData = await api.getZoneOffers(zoneToUse.id);
+          setOffers(offersData);
+        }
+      } catch (fallbackError) {
+        console.error('Fallback also failed:', fallbackError);
+        setZones([]);
+        setOffers([]);
+      }
     } finally {
       setLoading(false);
     }
