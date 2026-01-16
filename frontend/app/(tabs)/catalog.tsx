@@ -107,9 +107,14 @@ export default function CatalogScreen() {
 
   const loadData = async () => {
     try {
-      // Fetch zones first
-      const zonesData = await api.getRetailerZones();
+      // Fetch zones and products in parallel (products don't depend on zone)
+      const [zonesData, productsData] = await Promise.all([
+        api.getRetailerZones(),
+        api.getProducts()
+      ]);
+      
       setZones(zonesData);
+      setProducts(productsData);
       
       if (zonesData.length > 0) {
         // Determine which zone to use
@@ -124,20 +129,15 @@ export default function CatalogScreen() {
         const offersData = await api.getZoneOffers(zoneToUse.id);
         setOffers(offersData);
         
-        // Extract unique categories
+        // Extract unique categories from offers
         const categorySet = new Set<string>();
         offersData.forEach((o: SupplierOffer) => {
           if (o.product_category) categorySet.add(o.product_category);
         });
         setCategories(Array.from(categorySet));
-        
-        // Fetch products
-        const productsData = await api.getProducts();
-        setProducts(productsData);
       } else {
         setSelectedZone(null);
         setOffers([]);
-        setProducts([]);
       }
     } catch (error) {
       console.error('Failed to load data:', error);
